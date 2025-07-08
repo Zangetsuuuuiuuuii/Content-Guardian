@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Content Guardian</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .register-container {
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            background-color: white;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo-text {
+            font-size: 32px;
+            font-weight: bold;
+            color: #20639B;
+        }
+        .logo-icon {
+            font-size: 40px;
+            color: #20639B;
+            margin-right: 10px;
+        }
+        .form-label {
+            font-weight: 500;
+        }
+        .btn-primary {
+            background-color: #20639B;
+            border-color: #20639B;
+            padding: 10px 20px;
+        }
+        .btn-primary:hover {
+            background-color: #174d78;
+            border-color: #174d78;
+        }
+        .login-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .password-wrapper {
+            position: relative;
+        }
+        .password-toggle {
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #6c757d;
+        }
+        .phone-container {
+            border: 1px solid #ced4da;
+            border-radius: 0.375rem;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+        .phone-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .phone-field {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .phone-field input {
+            flex-grow: 1;
+        }
+        .remove-phone {
+            margin-left: 10px;
+            cursor: pointer;
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="register-container">
+            <div class="logo">
+                <span class="logo-icon">🛡️</span>
+                <span class="logo-text">Content Guardian</span>
+            </div>
+            
+            <h4 class="text-center mb-4">Create Your Account</h4>
+            
+            <form id="registerForm">
+                <div class="mb-3">
+                    <label for="fullName" class="form-label">Full Name</label>
+                    <input type="text" class="form-control" id="fullName" name="fullName" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email address</label>
+                    <input type="email" class="form-control" id="email" name="email" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Account Type</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="accountType" id="userRole" value="user" checked>
+                        <label class="form-check-label" for="userRole">
+                            User Account - Create a standard user account
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="accountType" id="guardianRole" value="guardian">
+                        <label class="form-check-label" for="guardianRole">
+                            Guardian Account - Create an account to monitor and supervise users
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" class="form-control" id="password" name="password" required>
+                        <span class="password-toggle" id="passwordToggle">
+                            <i class="bi bi-eye"></i>
+                        </span>
+                    </div>
+                    <div class="form-text">Password must be at least 8 characters long.</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="confirmPassword" class="form-label">Confirm Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" class="form-control" id="confirmPassword" name="confirmPassword" required>
+                        <span class="password-toggle" id="confirmPasswordToggle">
+                            <i class="bi bi-eye"></i>
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="mb-3" id="verificationEmailsSection">
+                    <label class="form-label">Email Addresses (Required for verification)</label>
+                    <div id="emailAddresses" class="phone-container">
+                        <div class="phone-header">
+                            <span>Add at least one email address to receive verification codes</span>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="addEmailBtn">
+                                <i class="bi bi-plus"></i> Add Email
+                            </button>
+                        </div>
+                        <div id="emailFieldsContainer">
+                            <div class="email-field phone-field">
+                                <input type="email" class="form-control" name="verificationEmail1" placeholder="Enter email address" required>
+                                <span class="remove-email remove-phone" title="Remove"><i class="bi bi-x-circle"></i></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary" id="registerButton">Create Account</button>
+                </div>
+                
+                <div id="registerError" class="text-danger mt-2" style="display: none;"></div>
+                <div id="registerInfo" class="text-info mt-2" style="display: none;"></div>
+            </form>
+            
+            <div class="login-link">
+                <p>Already have an account? <a href="index.html">Sign in</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/user-management.js"></script>
+    <script>
+        // Configuration
+        const API_BASE_URL = '/api';
+        const API_ENDPOINTS = {
+            REGISTER: `${API_BASE_URL}/register`,
+            CHECK_EMAIL: `${API_BASE_URL}/check-email`
+        };
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Setup event listeners
+            document.getElementById('registerForm').addEventListener('submit', registerUser);
+            document.getElementById('passwordToggle').addEventListener('click', togglePasswordVisibility);
+            document.getElementById('confirmPasswordToggle').addEventListener('click', toggleConfirmPasswordVisibility);
+            document.getElementById('addEmailBtn').addEventListener('click', addEmailField);
+            
+            // Set up initial email removal
+            setupEmailRemoval();
+            
+            // Set up account type radio buttons
+            setupAccountTypeToggle();
+        });
+        
+        function setupEmailRemoval() {
+            document.querySelectorAll('.remove-email').forEach(button => {
+                button.addEventListener('click', function() {
+                    const container = document.getElementById('emailFieldsContainer');
+                    if (container.children.length > 1) {
+                        this.parentElement.remove();
+                        // Renumber the email fields after removal
+                        renumberEmailFields();
+                    } else {
+                        alert('You need at least one email address');
+                    }
+                });
+            });
+        }
+        
+        function addEmailField() {
+            const container = document.getElementById('emailFieldsContainer');
+            const emailCount = container.children.length;
+            const newField = document.createElement('div');
+            newField.className = 'email-field phone-field';
+            
+            // Check if user or guardian role is selected
+            const isUser = document.getElementById('userRole').checked;
+            const requiredAttr = isUser ? 'required' : '';
+            
+            newField.innerHTML = `
+                <input type="email" class="form-control" name="verificationEmail${emailCount + 1}" placeholder="Enter email address" ${requiredAttr}>
+                <span class="remove-email remove-phone" title="Remove"><i class="bi bi-x-circle"></i></span>
+            `;
+            container.appendChild(newField);
+            
+            // Setup remove button
+            newField.querySelector('.remove-email').addEventListener('click', function() {
+                if (container.children.length > 1) {
+                    newField.remove();
+                    // Renumber the email fields after removal
+                    renumberEmailFields();
+                } else {
+                    alert('You need at least one email address');
+                }
+            });
+        }
+        
+        function renumberEmailFields() {
+            const container = document.getElementById('emailFieldsContainer');
+            const emailFields = container.querySelectorAll('input[type="email"]');
+            
+            emailFields.forEach((field, index) => {
+                field.name = `verificationEmail${index + 1}`;
+            });
+        }
+        
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('password');
+            const icon = document.querySelector('#passwordToggle i');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        }
+        
+        function toggleConfirmPasswordVisibility() {
+            const passwordInput = document.getElementById('confirmPassword');
+            const icon = document.querySelector('#confirmPasswordToggle i');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        }
+        
+        // Function to toggle required attribute on email inputs
+        function toggleEmailRequired(isRequired) {
+            const emailInputs = document.querySelectorAll('#emailFieldsContainer input[type="email"]');
+            emailInputs.forEach(input => {
+                if (isRequired) {
+                    input.setAttribute('required', '');
+                } else {
+                    input.removeAttribute('required');
+                }
+            });
+        }
+        
+        function setupAccountTypeToggle() {
+            const userRole = document.getElementById('userRole');
+            const guardianRole = document.getElementById('guardianRole');
+            const emailSection = document.getElementById('verificationEmailsSection');
+            
+            // Initial state - show emails section for user role
+            const isUser = userRole.checked;
+            emailSection.style.display = isUser ? 'block' : 'none';
+            toggleEmailRequired(isUser);
+            
+            // Add event listeners for radio buttons
+            userRole.addEventListener('change', function() {
+                emailSection.style.display = 'block';
+                toggleEmailRequired(true);
+            });
+            
+            guardianRole.addEventListener('change', function() {
+                emailSection.style.display = 'none';
+                toggleEmailRequired(false);
+            });
+        }
+        
+        async function registerUser(event) {
+            event.preventDefault();
+            
+            // Get form data
+            const fullName = document.getElementById('fullName').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            // Get selected role
+            const selectedRole = document.querySelector('input[name="accountType"]:checked').value;
+            const isGuardian = selectedRole === 'guardian';
+            
+            // Get verification emails (only required for users, not guardians)
+            let verificationEmails = [];
+            if (!isGuardian) {
+                // Get all email inputs from the container, regardless of their name attribute
+                const emailInputs = document.querySelectorAll('#emailFieldsContainer input[type="email"]');
+                verificationEmails = Array.from(emailInputs).map(input => input.value).filter(value => value.trim() !== '');
+            }
+            
+            // Validation
+            if (!fullName || !email || !password) {
+                showError('Please fill all required fields.');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                showError('Passwords do not match.');
+                return;
+            }
+            
+            if (password.length < 8) {
+                showError('Password must be at least 8 characters long.');
+                return;
+            }
+            
+            // Only validate verification emails for user accounts
+            if (!isGuardian && verificationEmails.length === 0) {
+                showError('At least one email address is required for verification.');
+                return;
+            }
+            
+            // Clear errors
+            document.getElementById('registerError').style.display = 'none';
+            
+            // Show information message
+            const infoElement = document.getElementById('registerInfo');
+            infoElement.textContent = 'Creating your account...';
+            infoElement.style.display = 'block';
+            
+            try {
+                // Create user data
+                const userData = {
+                    full_name: fullName,
+                    email: email,
+                    password: password,
+                    role: selectedRole
+                };
+                
+                // Add verification emails only for user accounts
+                if (!isGuardian) {
+                    userData.verification_emails = verificationEmails;
+                }
+                
+                // Store user in local storage first to ensure it exists for the UserManagement class
+                const users = JSON.parse(localStorage.getItem('contentGuardianUsers') || '[]');
+                users.push(userData);
+                localStorage.setItem('contentGuardianUsers', JSON.stringify(users));
+                
+                // Use UserManagement class to create the user properly (if available)
+                if (window.userManagement) {
+                    try {
+                        // Create user in UserManagement system
+                        const newUser = window.userManagement.createUser(userData);
+                        console.log('User created in UserManagement:', newUser);
+                    } catch (umError) {
+                        console.error('Error creating user in UserManagement:', umError);
+                    }
+                }
+                
+                // Create an auth object
+                const authData = {
+                    token: 'demo-token-' + Math.random().toString(36).substring(2),
+                    refreshToken: 'demo-refresh-' + Math.random().toString(36).substring(2),
+                    userId: Math.floor(Math.random() * 10000),
+                    isLoggedIn: true,
+                    userInfo: {
+                        full_name: fullName,
+                        email: email,
+                        role: selectedRole
+                    }
+                };
+                
+                // Add verification emails to auth data only for user accounts
+                if (!isGuardian) {
+                    authData.userInfo.verification_emails = verificationEmails;
+                }
+                
+                // Store auth data
+                localStorage.setItem('contentGuardianAuth', JSON.stringify(authData));
+                
+                // Show success and redirect after a short delay
+                showSuccessMessage();
+                
+                // Redirect to appropriate dashboard
+                setTimeout(() => {
+                    window.location.href = selectedRole === 'guardian' ? 'guardian-dashboard.html' : 'user-dashboard.html';
+                }, 1500);
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                infoElement.style.display = 'none';
+                showError(error.message || 'Registration failed.');
+            }
+        }
+        
+        function validateEmail(email) {
+            const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+            return re.test(String(email).toLowerCase());
+        }
+        
+        function showSuccessMessage() {
+            const form = document.getElementById('registerForm');
+            
+            form.innerHTML = `
+                <div class="alert alert-success" role="alert">
+                    <h4 class="alert-heading">Registration Successful!</h4>
+                    <p>Your account has been created successfully.</p>
+                    <hr>
+                    <p class="mb-0">Redirecting you to the Dashboard...</p>
+                </div>
+            `;
+        }
+        
+        function showError(message) {
+            const errorElement = document.getElementById('registerError');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Guardian Debug</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .storage-item {
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .storage-header {
+            background-color: #e9ecef;
+            padding: 10px 15px;
+            font-weight: bold;
+            border-bottom: 1px solid #ddd;
+        }
+        .storage-content {
+            padding: 15px;
+        }
+        .btn-fix {
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container my-5">
+        <h1 class="mb-4">Content Guardian Debug</h1>
+        
+        <div class="d-flex justify-content-between mb-3">
+            <div>
+                <button id="refreshBtn" class="btn btn-primary">Refresh Data</button>
+                <button id="clearAllBtn" class="btn btn-danger">Clear All Storage</button>
+            </div>
+            <div>
+                <a href="index.html" class="btn btn-secondary">Login Page</a>
+                <a href="dashboard.html" class="btn btn-secondary">Dashboard</a>
+            </div>
+        </div>
+        
+        <div class="storage-item">
+            <div class="storage-header d-flex justify-content-between align-items-center">
+                <span>contentGuardianAuth</span>
+                <div>
+                    <button id="fixAuthBtn" class="btn btn-sm btn-warning btn-fix">Fix Role</button>
+                    <button id="clearAuthBtn" class="btn btn-sm btn-outline-danger">Clear</button>
+                </div>
+            </div>
+            <div class="storage-content">
+                <pre id="authData">Loading...</pre>
+            </div>
+        </div>
+        
+        <div class="storage-item">
+            <div class="storage-header d-flex justify-content-between align-items-center">
+                <span>contentGuardianUsers</span>
+                <button id="clearUsersBtn" class="btn btn-sm btn-outline-danger">Clear</button>
+            </div>
+            <div class="storage-content">
+                <pre id="usersData">Loading...</pre>
+            </div>
+        </div>
+        
+        <div class="storage-item">
+            <div class="storage-header d-flex justify-content-between align-items-center">
+                <span>contentGuardianUsersDB</span>
+                <button id="clearUsersDBBtn" class="btn btn-sm btn-outline-danger">Clear</button>
+            </div>
+            <div class="storage-content">
+                <pre id="usersDBData">Loading...</pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Refresh data on load
+            refreshData();
+            
+            // Add event listeners
+            document.getElementById('refreshBtn').addEventListener('click', refreshData);
+            document.getElementById('clearAllBtn').addEventListener('click', clearAllStorage);
+            document.getElementById('clearAuthBtn').addEventListener('click', () => clearStorage('contentGuardianAuth'));
+            document.getElementById('clearUsersBtn').addEventListener('click', () => clearStorage('contentGuardianUsers'));
+            document.getElementById('clearUsersDBBtn').addEventListener('click', () => clearStorage('contentGuardianUsersDB'));
+            document.getElementById('fixAuthBtn').addEventListener('click', fixAuthData);
+        });
+        
+        function refreshData() {
+            // Display localStorage data
+            displayStorageItem('contentGuardianAuth', 'authData');
+            displayStorageItem('contentGuardianUsers', 'usersData');
+            displayStorageItem('contentGuardianUsersDB', 'usersDBData');
+        }
+        
+        function displayStorageItem(storageKey, elementId) {
+            const element = document.getElementById(elementId);
+            const data = localStorage.getItem(storageKey);
+            
+            if (data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    element.textContent = JSON.stringify(parsed, null, 2);
+                } catch (e) {
+                    element.textContent = `Error parsing data: ${e.message}\n\nRaw data: ${data}`;
+                }
+            } else {
+                element.textContent = 'No data found';
+            }
+        }
+        
+        function clearStorage(key) {
+            if (confirm(`Are you sure you want to clear ${key}?`)) {
+                localStorage.removeItem(key);
+                refreshData();
+            }
+        }
+        
+        function clearAllStorage() {
+            if (confirm('Are you sure you want to clear all storage? This will log you out.')) {
+                localStorage.clear();
+                refreshData();
+            }
+        }
+        
+        function fixAuthData() {
+            try {
+                const authData = JSON.parse(localStorage.getItem('contentGuardianAuth') || '{}');
+                
+                if (authData && authData.userInfo) {
+                    // Set role to 'user' if missing or invalid
+                    if (!authData.userInfo.role || (authData.userInfo.role !== 'user' && authData.userInfo.role !== 'guardian')) {
+                        authData.userInfo.role = 'user';
+                    }
+                    
+                    localStorage.setItem('contentGuardianAuth', JSON.stringify(authData));
+                    alert(`Role fixed to: ${authData.userInfo.role}`);
+                    refreshData();
+                } else {
+                    alert('No auth data to fix');
+                }
+            } catch (e) {
+                alert(`Error fixing auth data: ${e.message}`);
+            }
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,9 @@
+For production use, create the following icon files in this directory:
+
+- icon16.png (16x16 pixels)
+- icon48.png (48x48 pixels) 
+- icon128.png (128x128 pixels)
+
+These are required for the extension to display properly in browsers.
+
+For now, you can use any shield or guard icon with a red/blue color scheme to match the Content Guardian theme. 

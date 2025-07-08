@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard - Content Guardian</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar-brand {
+            font-weight: bold;
+            color: #3cba54 !important;
+        }
+        .logo-icon {
+            font-size: 24px;
+            margin-right: 8px;
+        }
+        .sidebar {
+            background-color: #fff;
+            height: calc(100vh - 56px);
+            border-right: 1px solid #e9ecef;
+        }
+        .sidebar .nav-link {
+            color: #495057;
+            border-radius: 0;
+            padding: 0.75rem 1.25rem;
+            border-left: 3px solid transparent;
+        }
+        .sidebar .nav-link:hover {
+            background-color: #f8f9fa;
+        }
+        .sidebar .nav-link.active {
+            color: #3cba54;
+            border-left-color: #3cba54;
+            background-color: rgba(60, 186, 84, 0.05);
+        }
+        .sidebar .nav-link i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+        .content {
+            padding: 20px;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            font-weight: 500;
+        }
+        .badge-success {
+            background-color: #3cba54;
+        }
+        .badge-warning {
+            background-color: #f39c12;
+        }
+        .badge-danger {
+            background-color: #e74c3c;
+        }
+        .refresh-btn {
+            cursor: pointer;
+        }
+        .logout-btn {
+            cursor: pointer;
+        }
+        .supervision-active {
+            background-color: rgba(60, 186, 84, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <span class="logo-icon">🛡️</span>
+                Content Guardian
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="refreshData">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="logoutBtn">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html" onclick="localStorage.removeItem('contentGuardianAuth');">
+                            <i class="bi bi-house-door"></i> Home (Direct Link)
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 sidebar p-0">
+                <div class="nav flex-column">
+                    <a class="nav-link active" href="#activity-panel" data-bs-toggle="tab">
+                        <i class="bi bi-clock-history"></i> Activity
+                    </a>
+                    <a class="nav-link" href="#guardians-panel" data-bs-toggle="tab">
+                        <i class="bi bi-people"></i> My Guardians
+                    </a>
+                    <a class="nav-link" href="#supervision-panel" data-bs-toggle="tab">
+                        <i class="bi bi-shield-check"></i> Supervision Status
+                    </a>
+                    <a class="nav-link" href="#settings-panel" data-bs-toggle="tab">
+                        <i class="bi bi-gear"></i> Settings
+                    </a>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 content">
+                <div class="tab-content">
+                    <!-- Activity Panel -->
+                    <div class="tab-pane fade show active" id="activity-panel">
+                        <h2 class="mb-4">My Activity</h2>
+                        
+                        <div class="alert alert-info mb-4">
+                            <p class="mb-0">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Want to test the browsing history? 
+                                <a href="demo-sites.html" class="alert-link">Visit our demo sites</a> 
+                                to simulate browsing different types of content.
+                            </p>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Browsing History</span>
+                                <span class="refresh-btn" onclick="loadActivity()">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="noActivity" style="display: none; text-align: center; padding: 20px; color: #6c757d;">
+                                    No browsing activity recorded yet.
+                                    <div class="mt-3">
+                                        <a href="demo-sites.html" class="btn btn-sm btn-primary">Visit Demo Sites</a>
+                                    </div>
+                                </div>
+                                <table class="table table-hover mb-0" id="activityTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Date/Time</th>
+                                            <th>Website</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="activityList">
+                                        <!-- Activity will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Guardians Panel -->
+                    <div class="tab-pane fade" id="guardians-panel">
+                        <h2 class="mb-4">My Guardians</h2>
+                        
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Connected Guardians</span>
+                                <span class="refresh-btn" onclick="loadGuardians()">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="noGuardians" style="display: none; text-align: center; padding: 20px; color: #6c757d;">
+                                    No guardians linked to your account yet.
+                                </div>
+                                <table class="table table-hover mb-0" id="guardiansTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="guardiansList">
+                                        <!-- Guardians will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Supervision Panel -->
+                    <div class="tab-pane fade" id="supervision-panel">
+                        <h2 class="mb-4">Supervision Status</h2>
+                        
+                        <div id="supervisionActiveCard" class="card mb-4 border-success">
+                            <div class="card-header bg-success text-white">
+                                <span><i class="bi bi-shield-check me-2"></i> Supervised Mode Active</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="fs-5">Current Status:</span>
+                                    <span class="badge bg-success fs-6">Protected</span>
+                                </div>
+                                
+                                <p>You are currently in supervised mode. This means:</p>
+                                <ul>
+                                    <li>Your browsing is being monitored for inappropriate content</li>
+                                    <li>Blocked content can be accessed with supervision verification</li>
+                                    <li>Details of your browsing history are recorded</li>
+                                </ul>
+                                
+                                <div class="row mt-4" id="supervisionDetails">
+                                    <div class="col-md-6">
+                                        <p><strong>Started:</strong> <span id="supervisionStartTime">Loading...</span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p><strong>Expires:</strong> <span id="supervisionExpiryTime">Loading...</span></p>
+                                    </div>
+                                    <div class="col-12 mt-2">
+                                        <p><strong>Supervisor:</strong> <span id="supervisionSupervisor">Loading...</span></p>
+                                    </div>
+                                </div>
+                                
+                                <button id="disableSupervisionBtn" class="btn btn-outline-danger mt-3">
+                                    <i class="bi bi-shield-x me-2"></i> Disable Supervised Mode
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="supervisionInactiveCard" class="card mb-4 border-danger" style="display: none;">
+                            <div class="card-header bg-danger text-white">
+                                <span><i class="bi bi-shield-x me-2"></i> Supervised Mode Inactive</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="fs-5">Current Status:</span>
+                                    <span class="badge bg-danger fs-6">Unprotected</span>
+                                </div>
+                                
+                                <p>You are not in supervised mode. This means:</p>
+                                <ul>
+                                    <li>Potentially inappropriate content will be blocked without access</li>
+                                    <li>You won't be able to request temporary access to blocked content</li>
+                                    <li>Your browsing history is not being monitored</li>
+                                </ul>
+                                
+                                <button id="enableSupervisionBtn" class="btn btn-success mt-3">
+                                    <i class="bi bi-shield-check me-2"></i> Enable Supervised Mode
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <span>Recent Supervised Access</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="noSupervisionHistory" style="display: none; text-align: center; padding: 20px; color: #6c757d;">
+                                    No supervised access history yet.
+                                </div>
+                                <table class="table table-hover mb-0" id="supervisionHistoryTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Date/Time</th>
+                                            <th>Website</th>
+                                            <th>Content Type</th>
+                                            <th>Supervision Expires</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="supervisionHistoryList">
+                                        <!-- Supervision history will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Settings Panel -->
+                    <div class="tab-pane fade" id="settings-panel">
+                        <h2 class="mb-4">Settings</h2>
+                        
+                        <div class="card">
+                            <div class="card-header">Account Settings</div>
+                            <div class="card-body">
+                                <form id="settingsForm">
+                                    <div class="mb-3">
+                                        <label for="fullName" class="form-label">Full Name</label>
+                                        <input type="text" class="form-control" id="fullName">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="email" class="form-label">Email</label>
+                                        <input type="email" class="form-control" id="email" disabled>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="newPassword" class="form-label">New Password (leave blank to keep current)</label>
+                                        <input type="password" class="form-control" id="newPassword">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-lg-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Guardians</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>You have <span id="guardianCount" class="fw-bold">0</span> guardians monitoring your online activity.</p>
+                        <div id="guardianList">
+                            <!-- Guardian list will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add this right after the closing of the container-fluid div -->
+    <script>
+    // Initialize global supervised mode flag
+    window.supervised_mode = false;
+
+    // Function to check if supervised mode is active
+    function checkSupervisedMode() {
+        const supervisionActive = localStorage.getItem('contentGuardianSupervision') === 'active';
+        const supervisionData = JSON.parse(localStorage.getItem('contentGuardianSupervisionData') || '{}');
+        window.supervised_mode = supervisionActive || (supervisionData && supervisionData.active);
+        return window.supervised_mode;
+    }
+
+    // Initialize supervised mode on page load
+    checkSupervisedMode();
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/web-history-tracker.js"></script>
+    <script src="js/user-management.js"></script>
+    <script>
+        // Make sure we have the userManagement instance
+        if (!window.userManagement) {
+            console.error("UserManagement not initialized from user-management.js");
+        } else {
+            console.log("UserManagement found:", window.userManagement);
+        }
+        
+        const API_BASE_URL = 'http://localhost:8000/api';
+        let authData = null;
+        
+        // Sample sessions data for demonstration
+        const sampleSessions = [];
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if user is logged in
+            const storedAuth = localStorage.getItem('contentGuardianAuth');
+            if (!storedAuth) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            authData = JSON.parse(storedAuth);
+            
+            // Debug login auth data
+            console.log('Auth data:', authData);
+            console.log('User role:', authData.userInfo?.role);
+            
+            // Make sure this is not a guardian account
+            if (authData.userInfo && authData.userInfo.role === 'guardian') {
+                alert('This dashboard is only for user accounts.');
+                window.location.href = 'guardian-dashboard.html';
+                return;
+            }
+            
+            // If role is missing, assume this is a user account
+            if (!authData.userInfo.role) {
+                console.log('No role specified, assuming user role');
+                authData.userInfo.role = 'user';
+                localStorage.setItem('contentGuardianAuth', JSON.stringify(authData));
+            }
+            
+            // Make sure current user is in the database
+            let currentUser = window.userManagement.getUserByEmail(authData.userInfo.email);
+            if (!currentUser) {
+                console.log('Current user not found in database, adding...');
+                currentUser = window.userManagement.createUser({
+                    full_name: authData.userInfo.full_name || 'Current User',
+                    email: authData.userInfo.email,
+                    role: 'user'
+                });
+                console.log('Added current user to database:', currentUser);
+            } else {
+                console.log('Found user in database:', currentUser);
+            }
+            
+            // Load guardians linked to this user
+            loadGuardians();
+            
+            // Add event listener for logout with console debug
+            const logoutButton = document.getElementById('logoutBtn');
+            if (logoutButton) {
+                console.log("Adding click handler to logout button");
+                logoutButton.addEventListener('click', function(e) {
+                    e.preventDefault(); // Prevent default anchor behavior
+                    console.log("Logout button clicked");
+                    logout();
+                });
+            } else {
+                console.error("Logout button not found!");
+            }
+            
+            // Also load the activity data
+            loadActivity();
+            
+            // Load supervision status
+            loadSupervisionStatus();
+        });
+        
+        // Load guardians linked to the current user
+        function loadGuardians() {
+            try {
+                const userEmail = authData.userInfo.email;
+                const linkedGuardians = window.userManagement.getLinkedGuardians(userEmail);
+                console.log('Linked guardians:', linkedGuardians);
+                
+                // Get the current user with guardian count
+                const currentUser = window.userManagement.getUserByEmail(userEmail);
+                
+                // Display guardian count in the UI
+                const guardianCount = currentUser ? (currentUser.guardians_count || linkedGuardians.length) : linkedGuardians.length;
+                const guardianCountElement = document.getElementById('guardianCount');
+                
+                if (guardianCountElement) {
+                    guardianCountElement.textContent = guardianCount;
+                    
+                    // Add count badge
+                    if (guardianCount > 0) {
+                        guardianCountElement.classList.add('badge', 'bg-primary', 'rounded-pill');
+                        guardianCountElement.style.fontSize = '1.1rem';
+                        guardianCountElement.style.padding = '0.35em 0.65em';
+                    }
+                    
+                    // Add warning if no guardians
+                    const existingWarning = guardianCountElement.parentNode.querySelector('.alert-warning');
+                    if (existingWarning) {
+                        existingWarning.remove(); // Remove any existing warning
+                    }
+                    
+                    if (guardianCount === 0) {
+                        const warningElement = document.createElement('div');
+                        warningElement.className = 'alert alert-warning mt-3';
+                        warningElement.innerHTML = 'You don\'t have any guardians linked to your account. Ask a guardian to link your account.';
+                        guardianCountElement.parentNode.appendChild(warningElement);
+                    }
+                }
+                
+                // Display guardian list
+                const guardianListElement = document.getElementById('guardianList');
+                
+                if (guardianListElement) {
+                    guardianListElement.innerHTML = '';
+                    
+                    if (guardianCount === 0) {
+                        guardianListElement.innerHTML = '<div class="text-muted">No guardians linked yet</div>';
+                    } else {
+                        const list = document.createElement('ul');
+                        list.className = 'list-group';
+                        
+                        linkedGuardians.forEach(guardian => {
+                            const item = document.createElement('li');
+                            item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                            item.innerHTML = `
+                                <div>
+                                    <strong>${guardian.full_name}</strong>
+                                    <div class="small text-muted">${guardian.email}</div>
+                                </div>
+                                <span class="badge bg-primary rounded-pill">Active</span>
+                            `;
+                            list.appendChild(item);
+                        });
+                        
+                        guardianListElement.appendChild(list);
+                    }
+                }
+                
+                // Also update the guardians table in the guardians panel
+                updateGuardiansTable(linkedGuardians);
+                
+                // Make sure the guardian linking UI is set up
+                setupGuardianLinking();
+                
+                // Also check for pending requests
+                checkPendingRequests();
+                
+            } catch (error) {
+                console.error('Error loading guardians:', error);
+            }
+        }
+        
+        // Update the guardians table in the guardians panel
+        function updateGuardiansTable(guardians) {
+            const guardiansList = document.getElementById('guardiansList');
+            const noGuardians = document.getElementById('noGuardians');
+            const guardiansTable = document.getElementById('guardiansTable');
+            
+            if (!guardians || guardians.length === 0) {
+                if (noGuardians) noGuardians.style.display = 'block';
+                if (guardiansTable) guardiansTable.style.display = 'none';
+                return;
+            }
+            
+            if (noGuardians) noGuardians.style.display = 'none';
+            if (guardiansTable) guardiansTable.style.display = 'table';
+            if (guardiansList) {
+                guardiansList.innerHTML = '';
+                
+                guardians.forEach(guardian => {
+                    const row = document.createElement('tr');
+                    const statusBadge = '<span class="badge bg-success">Active</span>';
+                    
+                    row.innerHTML = `
+                        <td>${guardian.full_name}</td>
+                        <td>${guardian.email}</td>
+                        <td>${statusBadge}</td>
+                    `;
+                    
+                    guardiansList.appendChild(row);
+                });
+            }
+        }
+        
+        function logout() {
+            console.log("Logout function called");
+            try {
+                // Remove auth data
+                localStorage.removeItem('contentGuardianAuth');
+                
+                // Redirect to login page with simplest approach
+                window.location.href = "index.html";
+            } catch (error) {
+                console.error("Error during logout:", error);
+                alert("Error during logout. Attempting alternative redirect...");
+                
+                // Try alternative approach
+                document.location.href = "index.html";
+            }
+        }
+
+        function loadActivity() {
+            // Get history from local storage
+            const history = JSON.parse(localStorage.getItem('contentGuardianHistory') || '[]');
+            
+            const tableBody = document.getElementById('activityList');
+            const noActivityMessage = document.getElementById('noActivity');
+            
+            // Clear table
+            tableBody.innerHTML = '';
+            
+            if (history.length === 0) {
+                // Show no activity message
+                noActivityMessage.style.display = 'block';
+                document.getElementById('activityTable').style.display = 'none';
+            } else {
+                // Hide no activity message and show table
+                noActivityMessage.style.display = 'none';
+                document.getElementById('activityTable').style.display = 'table';
+                
+                // Add entries to table
+                history.forEach(entry => {
+                    const row = document.createElement('tr');
+                    
+                    // Highlight supervised entries
+                    if (entry.status === 'supervised') {
+                        row.classList.add('supervision-active');
+                        row.style.backgroundColor = 'rgba(60, 186, 84, 0.1)';
+                    }
+                    
+                    // Date column
+                    const dateCell = document.createElement('td');
+                    const date = new Date(entry.timestamp);
+                    dateCell.textContent = formatDateTime(date);
+                    
+                    // Website column
+                    const websiteCell = document.createElement('td');
+                    const link = document.createElement('a');
+                    link.href = entry.url;
+                    link.textContent = entry.title || entry.url;
+                    link.target = '_blank';
+                    websiteCell.appendChild(link);
+                    
+                    // Status column
+                    const statusCell = document.createElement('td');
+                    let statusBadge = '';
+                    
+                    switch (entry.status) {
+                        case 'allowed':
+                            statusBadge = '<span class="badge bg-success">Allowed</span>';
+                            break;
+                        case 'blocked':
+                            statusBadge = `<span class="badge bg-danger">Blocked${entry.type ? ' (' + entry.type + ')' : ''}</span>`;
+                            break;
+                        case 'supervised':
+                            statusBadge = `<span class="badge bg-warning text-dark">Supervised${entry.type ? ' (' + entry.type + ')' : ''}</span>`;
+                            break;
+                        default:
+                            statusBadge = '<span class="badge bg-secondary">Unknown</span>';
+                    }
+                    
+                    statusCell.innerHTML = statusBadge;
+                    
+                    // Add cells to row
+                    row.appendChild(dateCell);
+                    row.appendChild(websiteCell);
+                    row.appendChild(statusCell);
+                    
+                    // Add row to table
+                    tableBody.appendChild(row);
+                });
+            }
+        }
+        
+        function loadSessions() {
+            const sessionsList = document.getElementById('sessionsList');
+            const noSessions = document.getElementById('noSessions');
+            const sessionsTable = document.getElementById('sessionsTable');
+            
+            if (sampleSessions.length === 0) {
+                noSessions.style.display = 'block';
+                sessionsTable.style.display = 'none';
+                return;
+            }
+            
+            noSessions.style.display = 'none';
+            sessionsTable.style.display = 'table';
+            sessionsList.innerHTML = '';
+            
+            sampleSessions.forEach(session => {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>${formatDate(session.date)}</td>
+                    <td>${session.guardian}</td>
+                    <td>${session.duration}</td>
+                `;
+                
+                sessionsList.appendChild(row);
+            });
+        }
+
+        function checkSupervisionStatus() {
+            // Simulate checking if supervision is active
+            const isSupervised = localStorage.getItem('contentGuardianSupervision') === 'active';
+            
+            const statusIcon = document.getElementById('statusIcon');
+            const statusText = document.getElementById('statusText');
+            const statusDescription = document.getElementById('statusDescription');
+            
+            if (isSupervised) {
+                statusIcon.innerHTML = '🔓';
+                statusText.innerHTML = 'Supervision Mode';
+                statusDescription.innerHTML = 'You are currently in supervised browsing mode. Content that would normally be blocked may be accessible.';
+                document.getElementById('supervisionStatus').classList.add('supervision-active');
+            } else {
+                statusIcon.innerHTML = '🔒';
+                statusText.innerHTML = 'Normal Mode';
+                statusDescription.innerHTML = 'You are in normal browsing mode. Content filtering is active.';
+                document.getElementById('supervisionStatus').classList.remove('supervision-active');
+            }
+        }
+
+        function loadUserProfile() {
+            // Use stored auth data for user info if available
+            if (authData && authData.userInfo) {
+                document.getElementById('fullName').value = authData.userInfo.full_name;
+                document.getElementById('email').value = authData.userInfo.email;
+                return;
+            }
+            
+            // Sample profile data
+            document.getElementById('fullName').value = 'Alex User';
+            document.getElementById('email').value = 'alex@example.com';
+        }
+
+        function saveSettings(e) {
+            e.preventDefault();
+            
+            const fullName = document.getElementById('fullName').value;
+            const newPassword = document.getElementById('newPassword').value;
+            
+            // Update stored user info
+            if (authData && authData.userInfo) {
+                authData.userInfo.full_name = fullName;
+                if (newPassword) {
+                    // In a real app, we would hash the password and send to API
+                    console.log('Password would be updated');
+                }
+                
+                localStorage.setItem('contentGuardianAuth', JSON.stringify(authData));
+            }
+            
+            alert('Settings saved successfully!');
+        }
+
+        function refreshAllData() {
+            loadActivity();
+            loadGuardians();
+            loadSessions();
+            checkSupervisionStatus();
+            checkPendingRequests();
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        // Set up guardian linking functionality
+        function setupGuardianLinking() {
+            const noGuardians = document.getElementById('noGuardians');
+            
+            // Add link form to the "no guardians" message
+            noGuardians.innerHTML = `
+                No guardians linked to your account yet.
+                <div class="mt-3">
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addGuardianModal">
+                        <i class="bi bi-person-plus"></i> Link a Guardian
+                    </button>
+                </div>
+            `;
+            
+            // Create modal for adding a guardian
+            const modalDiv = document.createElement('div');
+            modalDiv.className = 'modal fade';
+            modalDiv.id = 'addGuardianModal';
+            modalDiv.tabIndex = '-1';
+            modalDiv.setAttribute('aria-hidden', 'true');
+            
+            modalDiv.innerHTML = `
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Link Guardian Account</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="addGuardianForm">
+                                <div class="mb-3">
+                                    <label for="guardianEmail" class="form-label">Guardian Email</label>
+                                    <input type="email" class="form-control" id="guardianEmail" required>
+                                    <div class="form-text">Enter the email of a registered guardian account to link.</div>
+                                </div>
+                                <div id="addGuardianError" class="text-danger mb-3" style="display: none;"></div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="addGuardianBtn">Link Guardian</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add modal to body
+            document.body.appendChild(modalDiv);
+            
+            // Add event listener for the add guardian button
+            document.getElementById('addGuardianBtn').addEventListener('click', addGuardian);
+        }
+        
+        // Add a guardian
+        async function addGuardian() {
+            const email = document.getElementById('guardianEmail').value;
+            const errorElement = document.getElementById('addGuardianError');
+            
+            if (!email) {
+                errorElement.textContent = 'Please enter a guardian email';
+                errorElement.style.display = 'block';
+                return;
+            }
+            
+            errorElement.style.display = 'none';
+            
+            try {
+                // Check if guardian exists
+                const targetGuardian = window.userManagement.getUserByEmail(email);
+                
+                if (!targetGuardian) {
+                    errorElement.textContent = 'Guardian not found. Make sure they have registered first.';
+                    errorElement.style.display = 'block';
+                    return;
+                }
+                
+                if (targetGuardian.role !== 'guardian') {
+                    errorElement.textContent = 'You can only link guardian accounts, not other users.';
+                    errorElement.style.display = 'block';
+                    return;
+                }
+                
+                // Send link request
+                window.userManagement.requestLink(authData.userInfo.email, email);
+                
+                // Close modal and show success message
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addGuardianModal'));
+                modal.hide();
+                
+                // Show alert
+                showAlert('Link request sent! The guardian will need to approve it.', 'success');
+                
+                // Refresh guardians list in case there are pending requests
+                loadGuardians();
+                
+            } catch (error) {
+                errorElement.textContent = error.message || 'Failed to link guardian';
+                errorElement.style.display = 'block';
+            }
+        }
+        
+        // Check for pending link requests
+        function checkPendingRequests() {
+            try {
+                const pendingRequests = window.userManagement.getPendingRequests(authData.userInfo.email);
+                
+                if (pendingRequests && pendingRequests.length > 0) {
+                    // Show notification
+                    showAlert(`You have ${pendingRequests.length} pending guardian link request(s). Check the "Link Requests" section.`, 'info');
+                    
+                    // Add a section for pending requests if it doesn't exist
+                    if (!document.getElementById('pendingRequestsCard')) {
+                        const guardiansPanel = document.getElementById('guardians-panel');
+                        
+                        const requestsCard = document.createElement('div');
+                        requestsCard.id = 'pendingRequestsCard';
+                        requestsCard.className = 'card mt-4';
+                        requestsCard.innerHTML = `
+                            <div class="card-header">Pending Link Requests</div>
+                            <div class="card-body p-0">
+                                <table class="table table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Guardian</th>
+                                            <th>Email</th>
+                                            <th>Date</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="requestsList">
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                        
+                        // Insert after the main guardians card
+                        const guardiansCard = document.querySelector('#guardians-panel .card');
+                        guardiansCard.parentNode.insertBefore(requestsCard, guardiansCard.nextSibling);
+                    }
+                    
+                    // Populate the requests list
+                    const requestsList = document.getElementById('requestsList');
+                    requestsList.innerHTML = '';
+                    
+                    pendingRequests.forEach(request => {
+                        // Get guardian info
+                        const guardian = window.userManagement.getUserByEmail(request.guardianEmail);
+                        
+                        if (guardian) {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${guardian.full_name || 'Unknown'}</td>
+                                <td>${guardian.email}</td>
+                                <td>${formatDate(request.timestamp)}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-success me-2" onclick="acceptRequest('${request.guardianEmail}')">
+                                        <i class="bi bi-check"></i> Accept
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="rejectRequest('${request.guardianEmail}')">
+                                        <i class="bi bi-x"></i> Reject
+                                    </button>
+                                </td>
+                            `;
+                            requestsList.appendChild(row);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error checking pending requests:', error);
+            }
+        }
+        
+        // Accept a link request
+        function acceptRequest(guardianEmail) {
+            try {
+                window.userManagement.acceptRequest(guardianEmail, authData.userInfo.email);
+                showAlert('Link request accepted', 'success');
+                
+                // Refresh UI
+                loadGuardians();
+                checkPendingRequests();
+            } catch (error) {
+                showAlert('Error accepting request: ' + error.message, 'danger');
+            }
+        }
+        
+        // Reject a link request
+        function rejectRequest(guardianEmail) {
+            try {
+                window.userManagement.rejectRequest(guardianEmail, authData.userInfo.email);
+                showAlert('Link request rejected', 'warning');
+                
+                // Refresh UI
+                checkPendingRequests();
+            } catch (error) {
+                showAlert('Error rejecting request: ' + error.message, 'danger');
+            }
+        }
+        
+        // Show an alert notification
+        function showAlert(message, type = 'info') {
+            const alertsContainer = document.querySelector('.content');
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.setAttribute('role', 'alert');
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            // Insert at the top
+            alertsContainer.insertBefore(alertDiv, alertsContainer.firstChild);
+            
+            // Auto dismiss after 5 seconds
+            setTimeout(() => {
+                alertDiv.classList.remove('show');
+                setTimeout(() => alertDiv.remove(), 150);
+            }, 5000);
+        }
+
+        // Load supervision status information and history
+        function loadSupervisionStatus() {
+            // Update global supervised mode flag
+            checkSupervisedMode();
+            
+            // Use the global flag to determine if supervision is active
+            const isActive = window.supervised_mode;
+            
+            // Show/hide appropriate cards
+            document.getElementById('supervisionActiveCard').style.display = isActive ? 'block' : 'none';
+            document.getElementById('supervisionInactiveCard').style.display = isActive ? 'none' : 'block';
+            
+            if (isActive) {
+                const supervisionData = JSON.parse(localStorage.getItem('contentGuardianSupervisionData') || '{}');
+                
+                // Format dates for display
+                const startTime = supervisionData.startTime ? new Date(supervisionData.startTime) : new Date();
+                const expiryTime = supervisionData.expiryTime ? new Date(supervisionData.expiryTime) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+                
+                // Update displayed information
+                document.getElementById('supervisionStartTime').textContent = formatDateTime(startTime);
+                document.getElementById('supervisionExpiryTime').textContent = formatDateTime(expiryTime);
+                document.getElementById('supervisionSupervisor').textContent = supervisionData.supervisor || 'System';
+            }
+            
+            // Load supervised content history
+            loadSupervisionHistory();
+        }
+
+        // Load supervision history
+        function loadSupervisionHistory() {
+            const history = JSON.parse(localStorage.getItem('contentGuardianHistory') || '[]');
+            const supervisionHistory = history.filter(entry => entry.status === 'supervised');
+            
+            const tableBody = document.getElementById('supervisionHistoryList');
+            const noHistoryMessage = document.getElementById('noSupervisionHistory');
+            
+            // Clear table
+            tableBody.innerHTML = '';
+            
+            if (supervisionHistory.length === 0) {
+                // Show no history message
+                noHistoryMessage.style.display = 'block';
+                document.getElementById('supervisionHistoryTable').style.display = 'none';
+            } else {
+                // Hide no history message and show table
+                noHistoryMessage.style.display = 'none';
+                document.getElementById('supervisionHistoryTable').style.display = 'table';
+                
+                // Add entries to table
+                supervisionHistory.forEach(entry => {
+                    const row = document.createElement('tr');
+                    
+                    // Date/Time column
+                    const timeCell = document.createElement('td');
+                    timeCell.textContent = formatDateTime(new Date(entry.timestamp));
+                    
+                    // Website column
+                    const siteCell = document.createElement('td');
+                    const siteLink = document.createElement('a');
+                    siteLink.href = entry.url;
+                    siteLink.textContent = entry.title || entry.url;
+                    siteLink.target = '_blank';
+                    siteCell.appendChild(siteLink);
+                    
+                    // Content Type column
+                    const typeCell = document.createElement('td');
+                    typeCell.innerHTML = getContentTypeLabel(entry.type);
+                    
+                    // Supervision Expiry column
+                    const expiryCell = document.createElement('td');
+                    if (entry.supervision && entry.supervision.supervisionExpiry) {
+                        expiryCell.textContent = formatDateTime(new Date(entry.supervision.supervisionExpiry));
+                    } else {
+                        expiryCell.textContent = 'N/A';
+                    }
+                    
+                    // Add all cells to row
+                    row.appendChild(timeCell);
+                    row.appendChild(siteCell);
+                    row.appendChild(typeCell);
+                    row.appendChild(expiryCell);
+                    
+                    // Add row to table
+                    tableBody.appendChild(row);
+                });
+            }
+        }
+
+        // Format date and time for display
+        function formatDateTime(date) {
+            if (!(date instanceof Date) || isNaN(date)) {
+                return 'Invalid Date';
+            }
+            
+            return date.toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Get colored label for content type
+        function getContentTypeLabel(type) {
+            if (!type) return '<span class="badge bg-secondary">Unknown</span>';
+            
+            const typeLabels = {
+                'violence': '<span class="badge bg-danger">Violence</span>',
+                'hate': '<span class="badge bg-danger">Hate Speech</span>',
+                'nsfw': '<span class="badge bg-danger">Adult Content</span>',
+                'illegal': '<span class="badge bg-danger">Illegal Content</span>',
+                'unprotected': '<span class="badge bg-warning text-dark">Unprotected Site</span>',
+                'safe': '<span class="badge bg-success">Safe</span>'
+            };
+            
+            return typeLabels[type] || `<span class="badge bg-secondary">${type}</span>`;
+        }
+
+        // Enable supervised mode
+        document.getElementById('enableSupervisionBtn').addEventListener('click', function() {
+            // Get current user info
+            const authData = JSON.parse(localStorage.getItem('contentGuardianAuth') || '{}');
+            const userInfo = authData.userInfo || {};
+            
+            // Create supervision data
+            const supervisionData = {
+                active: true,
+                startTime: new Date().toISOString(),
+                expiryTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours by default
+                supervisor: userInfo.role === 'guardian' ? userInfo.email : 'System',
+                supervisedUser: userInfo.role === 'user' ? userInfo.email : null
+            };
+            
+            // Save supervision data
+            localStorage.setItem('contentGuardianSupervision', 'active');
+            localStorage.setItem('contentGuardianSupervisionData', JSON.stringify(supervisionData));
+            
+            // Set global supervised mode variable
+            window.supervised_mode = true;
+            
+            // Update UI
+            loadSupervisionStatus();
+            
+            // Reload the page to ensure all components recognize the supervised mode
+            window.location.reload();
+        });
+
+        // Disable supervised mode
+        document.getElementById('disableSupervisionBtn').addEventListener('click', function() {
+            // Confirm with user
+            if (confirm('Are you sure you want to disable supervised mode? You will no longer be able to access blocked content.')) {
+                // Disable supervision
+                localStorage.removeItem('contentGuardianSupervision');
+                
+                // Update supervision data to inactive
+                const supervisionData = JSON.parse(localStorage.getItem('contentGuardianSupervisionData') || '{}');
+                supervisionData.active = false;
+                supervisionData.endTime = new Date().toISOString();
+                localStorage.setItem('contentGuardianSupervisionData', JSON.stringify(supervisionData));
+                
+                // Update global supervised mode variable
+                window.supervised_mode = false;
+                
+                // Update UI
+                loadSupervisionStatus();
+                
+                // Reload the page to ensure all components update
+                window.location.reload();
+            }
+        });
+    </script>
+</body>
+</html> 
