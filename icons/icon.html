@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Icon Generator</title>
+</head>
+<body>
+  <h1>Icon Generator</h1>
+  <p>Use these data URLs to create the icon files:</p>
+
+  <h2>16x16 Icon</h2>
+  <canvas id="icon16" width="16" height="16"></canvas>
+  <p id="data16"></p>
+
+  <h2>48x48 Icon</h2>
+  <canvas id="icon48" width="48" height="48"></canvas>
+  <p id="data48"></p>
+
+  <h2>128x128 Icon</h2>
+  <canvas id="icon128" width="128" height="128"></canvas>
+  <p id="data128"></p>
+
+  <script>
+    function drawIcon(canvas, color) {
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      
+      // Draw a simple red shield with exclamation mark
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, width, height);
+      
+      ctx.fillStyle = 'white';
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const size = Math.min(width, height) * 0.6;
+      
+      // Draw an exclamation mark
+      ctx.fillRect(centerX - size/6, centerY - size/2, size/3, size * 0.7);
+      ctx.beginPath();
+      ctx.arc(centerX, centerY + size/3, size/6, 0, Math.PI * 2);
+      ctx.fill();
+      
+      return canvas.toDataURL('image/png');
+    }
+    
+    // Generate icons
+    const icon16 = document.getElementById('icon16');
+    const icon48 = document.getElementById('icon48');
+    const icon128 = document.getElementById('icon128');
+    
+    const data16 = drawIcon(icon16, '#cc0000');
+    const data48 = drawIcon(icon48, '#cc0000');
+    const data128 = drawIcon(icon128, '#cc0000');
+    
+    // Display data URLs
+    document.getElementById('data16').textContent = data16;
+    document.getElementById('data48').textContent = data48;
+    document.getElementById('data128').textContent = data128;
+  </script>
+</body>
+</html> 

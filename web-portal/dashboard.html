@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Content Guardian</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar-brand {
+            font-weight: bold;
+            color: #20639B !important;
+        }
+        .logo-icon {
+            font-size: 24px;
+            margin-right: 8px;
+        }
+        .sidebar {
+            background-color: #fff;
+            height: calc(100vh - 56px);
+            border-right: 1px solid #e9ecef;
+        }
+        .sidebar .nav-link {
+            color: #495057;
+            border-radius: 0;
+            padding: 0.75rem 1.25rem;
+            border-left: 3px solid transparent;
+        }
+        .sidebar .nav-link:hover {
+            background-color: #f8f9fa;
+        }
+        .sidebar .nav-link.active {
+            color: #20639B;
+            border-left-color: #20639B;
+            background-color: rgba(32, 99, 155, 0.05);
+        }
+        .sidebar .nav-link i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+        .content {
+            padding: 20px;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            font-weight: 500;
+        }
+        .refresh-btn {
+            cursor: pointer;
+        }
+        .alert-item {
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+        .alert-item.new {
+            border-left-color: #dc3545;
+            background-color: rgba(220, 53, 69, 0.05);
+        }
+        .verification-code {
+            font-family: monospace;
+            font-size: 1.2rem;
+            padding: 10px;
+            text-align: center;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            margin: 15px 0;
+            letter-spacing: 3px;
+        }
+        .phone-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background-color: #20639B;
+            color: white;
+            font-size: 0.85rem;
+            margin-right: 5px;
+        }
+        .time-badge {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <span class="logo-icon">🛡️</span>
+                Content Guardian
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="refreshData">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="logoutBtn">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 sidebar p-0">
+                <div class="nav flex-column">
+                    <a class="nav-link active" href="#activity-panel" data-bs-toggle="tab">
+                        <i class="bi bi-shield-lock"></i> Blocked Content
+                    </a>
+                    <a class="nav-link" href="#settings-panel" data-bs-toggle="tab">
+                        <i class="bi bi-gear"></i> Settings
+                    </a>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 content">
+                <div class="tab-content">
+                    <!-- Blocked Content Panel -->
+                    <div class="tab-pane fade show active" id="activity-panel">
+                        <h2 class="mb-4">Blocked Content</h2>
+                        
+                        <div class="alert alert-info mb-4">
+                            <p class="mb-0">
+                                <i class="bi bi-info-circle me-2"></i>
+                                This page shows content that has been blocked by Content Guardian. 
+                                You can request supervised access to view blocked content.
+                            </p>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Recently Blocked Content</span>
+                                <span class="refresh-btn" onclick="loadBlockedContent()">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="noContent" style="display: none; text-align: center; padding: 20px; color: #6c757d;">
+                                    No blocked content to display. Content Guardian is actively protecting your browsing.
+                                </div>
+                                <div class="list-group list-group-flush" id="blockedContentList">
+                                    <!-- Blocked content will be loaded here -->
+                                    <div class="list-group-item p-3 text-center">
+                                        <div class="spinner-border text-primary" role="status"></div>
+                                        <div class="mt-2">Loading blocked content...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Settings Panel -->
+                    <div class="tab-pane fade" id="settings-panel">
+                        <h2 class="mb-4">Settings</h2>
+                        
+                        <div class="card">
+                            <div class="card-header">Account Settings</div>
+                            <div class="card-body">
+                                <div id="gmailAuthStatus" class="alert alert-warning mb-4">
+                                    <p><i class="bi bi-exclamation-triangle me-2"></i> Gmail authorization is required to send verification emails.</p>
+                                    <a href="/auth/gmail" class="btn btn-primary mt-2">
+                                        <i class="bi bi-envelope"></i> Authorize Gmail
+                                    </a>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <button type="button" id="testEmailBtn" class="btn btn-outline-primary mb-3">
+                                        <i class="bi bi-envelope-check"></i> Test Email Sending
+                                    </button>
+                                    <div id="testEmailResult" class="alert alert-info" style="display: none;"></div>
+                                </div>
+                                
+                                <form id="settingsForm">
+                                    <div class="mb-3">
+                                        <label for="fullName" class="form-label">Full Name</label>
+                                        <input type="text" class="form-control" id="fullName">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="email" class="form-label">Email</label>
+                                        <input type="email" class="form-control" id="email" disabled>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="form-label">Email Addresses (For Verification)</label>
+                                        <div id="emailAddresses" class="phone-container">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span>Email addresses will receive verification codes for supervised access</span>
+                                                <button type="button" class="btn btn-sm btn-outline-primary" id="addEmailBtn">
+                                                    <i class="bi bi-plus"></i> Add
+                                                </button>
+                                            </div>
+                                            <div id="emailAddressesList">
+                                                <!-- Email addresses will be listed here -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="newPassword" class="form-label">New Password (leave blank to keep current)</label>
+                                        <input type="password" class="form-control" id="newPassword">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Verification Modal -->
+    <div class="modal fade" id="verificationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Verification Required</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>To access this blocked content, a verification code has been sent to your registered email address(es):</p>
+                    
+                    <div id="verificationEmails">
+                        <!-- Email addresses will be listed here -->
+                    </div>
+                    
+                    <div class="verification-code" id="verificationCode">
+                        <!-- Code will be displayed here -->
+                    </div>
+                    
+                    <div class="mt-3">
+                        <label for="enteredVerificationCode" class="form-label">Enter Verification Code:</label>
+                        <input type="text" class="form-control" id="enteredVerificationCode" placeholder="Enter the code you received">
+                        <div id="verificationFeedback" class="invalid-feedback"></div>
+                    </div>
+                    
+                    <p class="text-muted small mt-2">
+                        <i class="bi bi-info-circle"></i> 
+                        This code must be entered to enable supervised access.
+                    </p>
+                    
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Supervised access is temporary and will be logged for safety purposes.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="verifyCodeButton">Verify Access</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // API endpoints
+        const API_BASE_URL = '/api';
+        const API_ENDPOINTS = {
+            BLOCKED_CONTENT: `${API_BASE_URL}/blocked-content`,
+            USER_PROFILE: `${API_BASE_URL}/user-profile`,
+            REQUEST_SUPERVISION: `${API_BASE_URL}/request-supervision`,
+            SAVE_SETTINGS: `${API_BASE_URL}/save-settings`,
+            GMAIL_STATUS: `${API_BASE_URL}/gmail-status`
+        };
+        
+        // Authentication data
+        let authData = null;
+        // Store current verification code
+        let currentVerificationCode = null;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if user is logged in
+            const storedAuth = localStorage.getItem('contentGuardianAuth');
+            if (!storedAuth) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            authData = JSON.parse(storedAuth);
+            
+            // Debug login auth data
+            console.log('Dashboard Auth data:', authData);
+            console.log('Dashboard role:', authData.userInfo?.role);
+            
+            // Check user role and redirect to appropriate dashboard if needed
+            if (authData.userInfo) {
+                // Ensure the role exists
+                if (!authData.userInfo.role) {
+                    console.log('No role specified, assuming user role');
+                    authData.userInfo.role = 'user';
+                    localStorage.setItem('contentGuardianAuth', JSON.stringify(authData));
+                }
+                
+                // Redirect based on role
+                if (authData.userInfo.role === 'user') {
+                    console.log('Redirecting to user dashboard');
+                    window.location.href = 'user-dashboard.html';
+                    return;
+                } else if (authData.userInfo.role === 'guardian') {
+                    console.log('Redirecting to guardian dashboard');
+                    window.location.href = 'guardian-dashboard.html';
+                    return;
+                }
+            }
+            
+            // Add event listeners
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+            document.getElementById('refreshData').addEventListener('click', refreshAllData);
+            document.getElementById('settingsForm').addEventListener('submit', saveSettings);
+            document.getElementById('addEmailBtn').addEventListener('click', addEmailAddress);
+            document.getElementById('testEmailBtn').addEventListener('click', testEmailSending);
+            document.getElementById('verifyCodeButton').addEventListener('click', verifyAccessCode);
+            
+            // Load initial data
+            loadUserProfile();
+            loadBlockedContent();
+            checkGmailAuthStatus();
+        });
+        
+        // Verify the entered access code
+        function verifyAccessCode() {
+            const enteredCode = document.getElementById('enteredVerificationCode').value;
+            const feedbackElement = document.getElementById('verificationFeedback');
+            
+            if (enteredCode === currentVerificationCode) {
+                // Success - code matches
+                document.getElementById('enteredVerificationCode').classList.remove('is-invalid');
+                
+                // Hide the modal
+                bootstrap.Modal.getInstance(document.getElementById('verificationModal')).hide();
+                
+                // Show success message
+                showAlert('Access granted! You can now view the blocked content.', 'success');
+            } else {
+                // Invalid code
+                document.getElementById('enteredVerificationCode').classList.add('is-invalid');
+                feedbackElement.textContent = 'Invalid verification code. Please try again.';
+            }
+        }
+        
+        // Utility function for API calls
+        async function fetchFromAPI(url, options = {}) {
+            try {
+                // Add spinner or loading indicator if needed
+                
+                // Add auth token to headers if available
+                if (authData && authData.token) {
+                    options.headers = {
+                        ...options.headers,
+                        'Authorization': `Bearer ${authData.token}`
+                    };
+                }
+                
+                // For demo purposes, simulate API call with timeout
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+                // Return demo data for now
+                if (url.includes('blocked-content')) {
+                    return getDemoBlockedContent();
+                } else if (url.includes('user-profile')) {
+                    return getDemoUserProfile();
+                } else if (url.includes('request-supervision')) {
+                    return getRequestSupervisionResponse();
+                } else if (url.includes('save-settings')) {
+                    return { success: true };
+                } else if (url.includes('gmail-status')) {
+                    return getGmailStatus();
+                }
+                
+                return null;
+            } catch (error) {
+                console.error('API request failed:', error);
+                showAlert(`API request failed: ${error.message}`, 'danger');
+                return null;
+            }
+        }
+        
+        // Generate demo data for development
+        function getDemoBlockedContent() {
+            return [
+                {
+                    id: 1,
+                    url: 'https://example.com/violent-content',
+                    title: 'Example of Violent Content',
+                    type: 'Violence',
+                    blocked_at: new Date(Date.now() - 25 * 60000).toISOString(),
+                    is_new: true
+                },
+                {
+                    id: 2,
+                    url: 'https://example.com/adult-content',
+                    title: 'Restricted Adult Content',
+                    type: 'Adult',
+                    blocked_at: new Date(Date.now() - 120 * 60000).toISOString(), 
+                    is_new: false
+                },
+                {
+                    id: 3,
+                    url: 'https://example.com/gambling',
+                    title: 'Online Gambling Site',
+                    type: 'Gambling',
+                    blocked_at: new Date(Date.now() - 240 * 60000).toISOString(),
+                    is_new: false
+                }
+            ];
+        }
+        
+        function getDemoUserProfile() {
+            // Use data from auth if available
+            if (authData && authData.userInfo) {
+                return authData.userInfo;
+            }
+            
+            return {
+                full_name: 'Demo User',
+                email: 'user@example.com',
+                verification_emails: ['alerts@example.com', 'backup@example.com']
+            };
+        }
+        
+        function getRequestSupervisionResponse() {
+            return {
+                success: true,
+                code: Math.floor(100000 + Math.random() * 900000).toString(),
+                emails: authData?.userInfo?.verification_emails || ['alerts@example.com']
+            };
+        }
+        
+        function getGmailStatus() {
+            return {
+                is_authorized: false
+            };
+        }
+        
+        async function loadBlockedContent() {
+            const contentList = document.getElementById('blockedContentList');
+            const noContent = document.getElementById('noContent');
+            
+            // Fetch blocked content from API
+            const data = await fetchFromAPI(API_ENDPOINTS.BLOCKED_CONTENT);
+            
+            if (!data || data.length === 0) {
+                noContent.style.display = 'block';
+                contentList.innerHTML = '';
+                return;
+            }
+            
+            noContent.style.display = 'none';
+            contentList.innerHTML = '';
+            
+            data.forEach(item => {
+                const alertItem = document.createElement('div');
+                alertItem.className = 'list-group-item list-group-item-action alert-item';
+                
+                if (item.is_new) {
+                    alertItem.classList.add('new');
+                }
+                
+                const timeSince = getTimeSince(new Date(item.blocked_at));
+                
+                alertItem.innerHTML = `
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">${item.title}</h6>
+                        <small class="time-badge">${timeSince}</small>
+                    </div>
+                    <p class="mb-1 text-truncate">${item.url}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><span class="badge bg-danger">${item.type}</span> content blocked</span>
+                        <button class="btn btn-sm btn-outline-primary request-access-btn" data-id="${item.id}">
+                            Request Supervised Access
+                        </button>
+                    </div>
+                `;
+                
+                contentList.appendChild(alertItem);
+            });
+            
+            // Add event listeners for request access buttons
+            document.querySelectorAll('.request-access-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const contentId = parseInt(this.getAttribute('data-id'));
+                    requestSupervision(contentId);
+                });
+            });
+        }
+        
+        async function loadUserProfile() {
+            // Fetch user profile from API
+            const userProfile = await fetchFromAPI(API_ENDPOINTS.USER_PROFILE);
+            
+            if (!userProfile) return;
+            
+            // Update auth data with latest profile
+            authData.userInfo = userProfile;
+            localStorage.setItem('contentGuardianAuth', JSON.stringify(authData));
+            
+            // Update form fields
+            document.getElementById('fullName').value = userProfile.full_name || '';
+            document.getElementById('email').value = userProfile.email || '';
+            
+            // Load email addresses
+            const emailAddressesList = document.getElementById('emailAddressesList');
+            emailAddressesList.innerHTML = '';
+            
+            const emailAddresses = userProfile.verification_emails || [];
+            
+            if (emailAddresses.length === 0) {
+                emailAddressesList.innerHTML = `
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        No email addresses added. You need at least one email address to use supervised access.
+                    </div>
+                `;
+            } else {
+                emailAddresses.forEach((email, index) => {
+                    const emailDiv = document.createElement('div');
+                    emailDiv.className = 'd-flex justify-content-between align-items-center mb-2';
+                    emailDiv.innerHTML = `
+                        <div>${email}</div>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-email" data-index="${index}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    `;
+                    emailAddressesList.appendChild(emailDiv);
+                });
+                
+                // Add event listeners for remove buttons
+                document.querySelectorAll('.remove-email').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const index = parseInt(this.getAttribute('data-index'));
+                        removeEmailAddress(index);
+                    });
+                });
+            }
+        }
+        
+        async function addEmailAddress() {
+            const email = prompt('Enter email address:');
+            if (!email) return;
+            
+            if (!authData.userInfo.verification_emails) {
+                authData.userInfo.verification_emails = [];
+            }
+            
+            // Add email address to user profile
+            authData.userInfo.verification_emails.push(email);
+            localStorage.setItem('contentGuardianAuth', JSON.stringify(authData));
+            
+            // Reload user profile
+            await loadUserProfile();
+            showAlert('Email address added successfully', 'success');
+        }
+        
+        async function removeEmailAddress(index) {
+            if (!authData.userInfo.verification_emails) return;
+            
+            if (authData.userInfo.verification_emails.length <= 1) {
+                showAlert('You need at least one email address for verification', 'warning');
+                return;
+            }
+            
+            // Remove email address from user profile
+            authData.userInfo.verification_emails.splice(index, 1);
+            localStorage.setItem('contentGuardianAuth', JSON.stringify(authData));
+            
+            // Reload user profile
+            await loadUserProfile();
+            showAlert('Email address removed', 'success');
+        }
+        
+        async function saveSettings(event) {
+            if (event) event.preventDefault();
+            
+            const fullName = document.getElementById('fullName').value;
+            const newPassword = document.getElementById('newPassword').value;
+            
+            // Save settings
+            const response = await fetchFromAPI(API_ENDPOINTS.SAVE_SETTINGS, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    full_name: fullName,
+                    password: newPassword || undefined
+                })
+            });
+            
+            if (response && response.success) {
+                // Update user profile
+                if (authData.userInfo) {
+                    authData.userInfo.full_name = fullName;
+                    localStorage.setItem('contentGuardianAuth', JSON.stringify(authData));
+                }
+                
+                // Clear password field
+                document.getElementById('newPassword').value = '';
+                
+                showAlert('Settings saved successfully', 'success');
+            }
+        }
+        
+        async function checkGmailAuthStatus() {
+            try {
+                const response = await fetchFromAPI(API_ENDPOINTS.GMAIL_STATUS);
+                
+                const gmailAuthStatus = document.getElementById('gmailAuthStatus');
+                if (response && response.is_authorized) {
+                    gmailAuthStatus.className = 'alert alert-success mb-4';
+                    gmailAuthStatus.innerHTML = `
+                        <p><i class="bi bi-check-circle me-2"></i> Gmail is authorized for sending verification emails.</p>
+                    `;
+                } else {
+                    gmailAuthStatus.className = 'alert alert-warning mb-4';
+                    gmailAuthStatus.innerHTML = `
+                        <p><i class="bi bi-exclamation-triangle me-2"></i> Gmail authorization is required to send verification emails.</p>
+                        <a href="/auth/gmail" class="btn btn-primary mt-2">
+                            <i class="bi bi-envelope"></i> Authorize Gmail
+                        </a>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error checking Gmail authorization status:', error);
+            }
+        }
+        
+        async function requestSupervision(contentId) {
+            // Check if user has email addresses
+            if (!authData.userInfo.verification_emails || authData.userInfo.verification_emails.length === 0) {
+                showAlert('You need at least one email address to request supervised access', 'warning');
+                return;
+            }
+            
+            // Request supervision with user data
+            const response = await fetchFromAPI(API_ENDPOINTS.REQUEST_SUPERVISION, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    content_id: contentId,
+                    userData: {
+                        email: authData.userInfo.email,
+                        verification_emails: authData.userInfo.verification_emails
+                    }
+                })
+            });
+            
+            if (!response || !response.success) return;
+            
+            // Show Gmail authorization alert if needed
+            if (!response.is_gmail_authorized) {
+                showAlert('Gmail authorization is required to send verification emails. Please authorize Gmail in Settings.', 'warning');
+            }
+            
+            // Show email results if any
+            if (response.email_results && response.email_results.length > 0) {
+                const successCount = response.email_results.filter(r => r.success).length;
+                if (successCount > 0) {
+                    showAlert(`Verification code sent to ${successCount} email address(es)`, 'success');
+                } else {
+                    showAlert('Failed to send verification emails. Please check Gmail authorization in Settings.', 'danger');
+                }
+            }
+            
+            // Show the verification modal
+            const verificationEmails = document.getElementById('verificationEmails');
+            verificationEmails.innerHTML = '';
+            
+            response.emails.forEach(email => {
+                const emailSpan = document.createElement('div');
+                emailSpan.className = 'mb-2';
+                emailSpan.innerHTML = `<span class="phone-badge"><i class="bi bi-envelope"></i> ${email}</span> Code sent!`;
+                verificationEmails.appendChild(emailSpan);
+            });
+            
+            // Set the verification code
+            document.getElementById('verificationCode').innerText = response.code;
+            // Store the verification code for later validation
+            currentVerificationCode = response.code;
+            
+            // Clear any previous validation
+            document.getElementById('enteredVerificationCode').value = '';
+            document.getElementById('enteredVerificationCode').classList.remove('is-invalid');
+            
+            // Show the modal
+            const modal = new bootstrap.Modal(document.getElementById('verificationModal'));
+            modal.show();
+        }
+        
+        async function refreshAllData() {
+            await Promise.all([
+                loadBlockedContent(),
+                loadUserProfile(),
+                checkGmailAuthStatus()
+            ]);
+            showAlert('Data refreshed', 'success');
+        }
+        
+        function logout() {
+            // Remove auth data
+            localStorage.removeItem('contentGuardianAuth');
+            
+            // Redirect to login page
+            window.location.href = "index.html";
+        }
+        
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+        
+        function getTimeSince(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            let interval = Math.floor(seconds / 31536000);
+            if (interval > 1) return interval + ' years ago';
+            if (interval === 1) return '1 year ago';
+            
+            interval = Math.floor(seconds / 2592000);
+            if (interval > 1) return interval + ' months ago';
+            if (interval === 1) return '1 month ago';
+            
+            interval = Math.floor(seconds / 86400);
+            if (interval > 1) return interval + ' days ago';
+            if (interval === 1) return '1 day ago';
+            
+            interval = Math.floor(seconds / 3600);
+            if (interval > 1) return interval + ' hours ago';
+            if (interval === 1) return '1 hour ago';
+            
+            interval = Math.floor(seconds / 60);
+            if (interval > 1) return interval + ' minutes ago';
+            if (interval === 1) return '1 minute ago';
+            
+            return 'just now';
+        }
+        
+        function showAlert(message, type = 'info') {
+            const alertsContainer = document.querySelector('.content');
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.setAttribute('role', 'alert');
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            // Insert at the top
+            alertsContainer.insertBefore(alertDiv, alertsContainer.firstChild);
+            
+            // Auto dismiss after 5 seconds
+            setTimeout(() => {
+                alertDiv.classList.remove('show');
+                setTimeout(() => alertDiv.remove(), 150);
+            }, 5000);
+        }
+        
+        async function testEmailSending() {
+            const resultDiv = document.getElementById('testEmailResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'alert alert-info';
+            resultDiv.innerHTML = '<i class="bi bi-hourglass-split me-2"></i> Sending test email...';
+            
+            try {
+                // Get user's email from profile
+                const email = authData.userInfo.email;
+                if (!email) {
+                    throw new Error('Email address not found in user profile');
+                }
+                
+                // Call the test email API
+                const response = await fetch(`${API_BASE_URL}/test-email?email=${encodeURIComponent(email)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'alert alert-success';
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-check-circle me-2"></i> 
+                        Test email sent successfully to ${data.email}<br>
+                        <small>Verification code: ${data.code}</small>
+                    `;
+                } else {
+                    resultDiv.className = 'alert alert-danger';
+                    resultDiv.innerHTML = `
+                        <i class="bi bi-x-circle me-2"></i> 
+                        ${data.message || 'Failed to send test email'}
+                    `;
+                }
+            } catch (error) {
+                console.error('Test email error:', error);
+                resultDiv.className = 'alert alert-danger';
+                resultDiv.innerHTML = `
+                    <i class="bi bi-x-circle me-2"></i> 
+                    Error: ${error.message || 'Failed to send test email'}
+                `;
+            }
+        }
+    </script>
+</body>
+</html> 
