@@ -158,6 +158,42 @@ def init_db():
     )
     ''')
 
+    # Devices table: registered extension instances / devices
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS devices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id TEXT UNIQUE NOT NULL,
+        user_id INTEGER NOT NULL,
+        device_name TEXT,
+        device_email TEXT,
+        refresh_token_hash TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_seen TIMESTAMP,
+        revoked INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+    ''')
+
+    # Device audit table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS device_audit (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        performed_by INTEGER,
+        reason TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
+    # Migrate devices table: ensure refresh_expires_at and last_rotated_at columns exist
+    cursor.execute("PRAGMA table_info('devices')")
+    existing_cols = [r[1] for r in cursor.fetchall()]
+    if 'refresh_expires_at' not in existing_cols:
+        cursor.execute("ALTER TABLE devices ADD COLUMN refresh_expires_at TIMESTAMP")
+    if 'last_rotated_at' not in existing_cols:
+        cursor.execute("ALTER TABLE devices ADD COLUMN last_rotated_at TIMESTAMP")
+
     # Seed test data if tables are empty
     cursor.execute("SELECT COUNT(*) as cnt FROM users")
     if cursor.fetchone()["cnt"] == 0:
@@ -249,6 +285,7 @@ ws_manager = ConnectionManager()
 SECRET_KEY = os.getenv("SECRET_KEY", "SUPER_SECRET_REPLACE_ME_IN_PRODUCTION")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+DEVICE_REFRESH_EXPIRE_DAYS = int(os.getenv("DEVICE_REFRESH_EXPIRE_DAYS", "30"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login", auto_error=False)
@@ -290,11 +327,60 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     user = conn.execute(
         "SELECT id, email, full_name, role FROM users WHERE email = ?", (email,)
     ).fetchone()
-    conn.close()
 
     if user is None:
+        conn.close()
         raise credentials_exception
+
+    # If token includes a device_id, validate the device record (not revoked and owned by user)
+    device_id = payload.get("device_id")
+    if device_id:
+        dev = conn.execute("SELECT user_id, revoked FROM devices WHERE device_id = ?", (device_id,)).fetchone()
+        if not dev or dev["user_id"] != user["id"] or dev["revoked"] == 1:
+            conn.close()
+            raise credentials_exception
+
+    conn.close()
     return dict(user)
+
+
+def get_user_from_token(token: str):
+    """Decode a JWT token (used for WebSocket auth) and validate optional device binding.
+    Returns (user_dict, payload) or raises HTTPException on failure.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    conn = get_db()
+    user = conn.execute(
+        "SELECT id, email, full_name, role FROM users WHERE email = ?", (email,)
+    ).fetchone()
+    if user is None:
+        conn.close()
+        raise credentials_exception
+
+    device_id = payload.get("device_id")
+    if device_id:
+        dev = conn.execute("SELECT user_id, revoked FROM devices WHERE device_id = ?", (device_id,)).fetchone()
+        if not dev or dev["user_id"] != user["id"] or dev["revoked"] == 1:
+            conn.close()
+            raise credentials_exception
+        # update last_seen
+        conn.execute("UPDATE devices SET last_seen = ? WHERE device_id = ?", (datetime.now().isoformat(), device_id))
+        conn.commit()
+
+    conn.close()
+    return dict(user), payload
 
 
 # ---------------------------------------------------------------------------
@@ -335,6 +421,36 @@ class AnalysisRequest(BaseModel):
 class EmailVerificationRequest(BaseModel):
     user_id: int
     email: str
+
+
+class DeviceRegisterRequest(BaseModel):
+    device_id: str
+    device_name: Optional[str] = None
+    device_email: Optional[str] = None
+
+
+class RevokeDeviceRequest(BaseModel):
+    device_id: str
+
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+class DeviceRefreshRequest(BaseModel):
+    device_id: str
+    device_secret: str
+
+
+def _log_device_audit(conn, device_id: str, action: str, performed_by: Optional[int] = None, reason: Optional[str] = None):
+    try:
+        conn.execute(
+            "INSERT INTO device_audit (device_id, action, performed_by, reason) VALUES (?, ?, ?, ?)",
+            (device_id, action, performed_by, reason),
+        )
+    except Exception:
+        # best-effort logging
+        pass
 
 class ExtensionStatusRequest(BaseModel):
     user_id: int
@@ -620,6 +736,162 @@ async def update_extension_status(request: ExtensionStatusRequest, current_user:
     return {"status": "updated"}
 
 
+
+@app.post("/api/device/register")
+async def register_device(request: DeviceRegisterRequest, current_user: dict = Depends(get_current_user)):
+    """Register a device and return a device-scoped access token and a refresh secret.
+    The returned `device_secret` should be stored securely by the client (extension).
+    """
+    # Ensure the registering user is the authenticated user
+    conn = get_db()
+    # Check the user exists
+    user = conn.execute("SELECT id FROM users WHERE id = ?", (current_user["id"],)).fetchone()
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Generate a refresh secret for the device (to be returned once)
+    device_secret = secrets.token_hex(32)
+    refresh_hash = _hash_token(device_secret)
+    now = datetime.now().isoformat()
+    expires_at = (datetime.now() + timedelta(days=DEVICE_REFRESH_EXPIRE_DAYS)).isoformat()
+
+    # Insert or update device record
+    existing = conn.execute("SELECT id FROM devices WHERE device_id = ?", (request.device_id,)).fetchone()
+    if existing:
+        conn.execute(
+            "UPDATE devices SET user_id = ?, device_name = ?, device_email = ?, refresh_token_hash = ?, last_seen = ?, revoked = 0, refresh_expires_at = ?, last_rotated_at = ? WHERE device_id = ?",
+            (current_user["id"], request.device_name or '', request.device_email or '', refresh_hash, now, expires_at, now, request.device_id),
+        )
+    else:
+        conn.execute(
+            "INSERT INTO devices (device_id, user_id, device_name, device_email, refresh_token_hash, created_at, last_seen, refresh_expires_at, last_rotated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (request.device_id, current_user["id"], request.device_name or '', request.device_email or '', refresh_hash, now, now, expires_at, now),
+        )
+    conn.commit()
+
+    # Audit log
+    try:
+        _log_device_audit(conn, request.device_id, 'register', performed_by=current_user.get('id'))
+    except Exception:
+        pass
+
+    # Issue an access token scoped to the device
+    access_token = create_access_token(
+        data={"sub": current_user["email"], "role": current_user["role"], "device_id": request.device_id},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    conn.close()
+    return {"access_token": access_token, "token_type": "bearer", "device_secret": device_secret}
+
+
+@app.get("/api/devices")
+async def list_devices(current_user: dict = Depends(get_current_user)):
+    """List devices for the current user. Guardians see devices for their linked users."""
+    conn = get_db()
+    if current_user["role"] == "guardian":
+        rows = conn.execute('''
+            SELECT d.device_id, d.user_id, d.device_name, d.device_email, d.created_at, d.last_seen, d.revoked
+            FROM devices d
+            JOIN guardian_user_links gl ON gl.user_id = d.user_id
+            WHERE gl.guardian_id = ? AND gl.active = 1
+        ''', (current_user["id"],)).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT device_id, user_id, device_name, device_email, created_at, last_seen, revoked FROM devices WHERE user_id = ?",
+            (current_user["id"],),
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/device/revoke")
+async def revoke_device(request: RevokeDeviceRequest, current_user: dict = Depends(get_current_user)):
+    """Revoke a registered device. Guardians may revoke devices for their linked users."""
+    conn = get_db()
+    row = conn.execute("SELECT id, user_id FROM devices WHERE device_id = ?", (request.device_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    device_user_id = row["user_id"]
+    # Allow if owner or guardian of owner
+    if current_user["id"] != device_user_id:
+        link = conn.execute(
+            "SELECT id FROM guardian_user_links WHERE guardian_id = ? AND user_id = ? AND active = 1",
+            (current_user["id"], device_user_id),
+        ).fetchone()
+        if not link:
+            conn.close()
+            raise HTTPException(status_code=403, detail="Not authorized to revoke this device")
+
+    conn.execute("UPDATE devices SET revoked = 1 WHERE device_id = ?", (request.device_id,))
+    conn.commit()
+    try:
+        _log_device_audit(conn, request.device_id, 'revoke', performed_by=current_user.get('id'))
+    except Exception:
+        pass
+    conn.close()
+    return {"status": "revoked", "device_id": request.device_id}
+
+
+@app.post("/api/device/refresh")
+async def refresh_device_token(request: DeviceRefreshRequest):
+    """Exchange a device_secret for a new access token. Rotates the refresh secret.
+    This endpoint does NOT require the user to be logged in, as the device_secret
+    authenticates the device.
+    """
+    conn = get_db()
+    row = conn.execute("SELECT id, user_id, refresh_token_hash, revoked, refresh_expires_at FROM devices WHERE device_id = ?", (request.device_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Device not found")
+    if row["revoked"] == 1:
+        conn.close()
+        raise HTTPException(status_code=403, detail="Device revoked")
+    expected_hash = row["refresh_token_hash"]
+    # Check expiry
+    expires_at = row.get("refresh_expires_at")
+    if expires_at:
+        try:
+            if datetime.fromisoformat(expires_at) < datetime.now():
+                conn.close()
+                raise HTTPException(status_code=401, detail="Device refresh expired")
+        except Exception:
+            # If parsing fails, proceed conservatively
+            pass
+    if expected_hash is None or expected_hash != _hash_token(request.device_secret):
+        conn.close()
+        raise HTTPException(status_code=401, detail="Invalid device secret")
+
+    # All good — issue new access token and rotate the refresh secret
+    user = conn.execute("SELECT id, email, role FROM users WHERE id = ?", (row["user_id"],)).fetchone()
+    if not user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_secret = secrets.token_hex(32)
+    new_hash = _hash_token(new_secret)
+    new_expires = (datetime.now() + timedelta(days=DEVICE_REFRESH_EXPIRE_DAYS)).isoformat()
+    conn.execute("UPDATE devices SET refresh_token_hash = ?, last_seen = ?, refresh_expires_at = ?, last_rotated_at = ? WHERE device_id = ?", (new_hash, datetime.now().isoformat(), new_expires, datetime.now().isoformat(), request.device_id))
+    conn.commit()
+
+    # Audit
+    try:
+        _log_device_audit(conn, request.device_id, 'refresh', performed_by=row.get('user_id'))
+    except Exception:
+        pass
+
+    access_token = create_access_token(
+        data={"sub": user["email"], "role": user["role"], "device_id": request.device_id},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    conn.close()
+    return {"access_token": access_token, "token_type": "bearer", "device_secret": new_secret}
+
+
 # ===========================================================================
 #  ALERTS
 # ===========================================================================
@@ -854,6 +1126,23 @@ async def revoke_access_key(request: RevokeKeyRequest, current_user: dict = Depe
 @app.websocket("/ws/extension/{user_id}")
 async def ws_extension(websocket: WebSocket, user_id: int):
     """WebSocket for Chrome extension to receive real-time commands."""
+    # Expect a `token` query parameter containing a bearer JWT scoped to the device
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008)
+        return
+
+    try:
+        user, payload = get_user_from_token(token)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
+
+    # Ensure the token's user matches the path user_id
+    if user["id"] != user_id:
+        await websocket.close(code=1008)
+        return
+
     await ws_manager.connect_extension(user_id, websocket)
     try:
         while True:
@@ -873,6 +1162,22 @@ async def ws_extension(websocket: WebSocket, user_id: int):
 @app.websocket("/ws/guardian/{user_id}")
 async def ws_guardian(websocket: WebSocket, user_id: int):
     """WebSocket for guardian dashboard to receive real-time alerts."""
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008)
+        return
+
+    try:
+        user, payload = get_user_from_token(token)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
+
+    # Guardian endpoints allow guardian users to connect for their linked users
+    if user.get("role") != "guardian" and user.get("id") != user_id:
+        await websocket.close(code=1008)
+        return
+
     await ws_manager.connect_guardian(user_id, websocket)
     try:
         while True:

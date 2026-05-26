@@ -19,7 +19,7 @@ let authState = {
 function loadAuthState() {
   chrome.storage.local.get(['contentGuardianAuth', 'contentGuardianSupervision'], function(result) {
     if (result.contentGuardianAuth) {
-      authState = result.contentGuardianAuth;
+    authState = result.contentGuardianAuth;
       
       // Automatically enter supervised mode when logged in
       if (authState.isLoggedIn) {
@@ -45,6 +45,76 @@ function loadAuthState() {
       }
     }
   });
+}
+
+
+// Device helpers: persistent device identifier and secret
+function _generateDeviceId() {
+  // simple UUID-like id
+  return 'dev-' + Math.random().toString(36).slice(2) + '-' + Date.now().toString(36);
+}
+
+function getDeviceInfo() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['contentGuardianDevice'], function(result) {
+      resolve(result.contentGuardianDevice || null);
+    });
+  });
+}
+
+function saveDeviceInfo(device) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ 'contentGuardianDevice': device }, function() { resolve(true); });
+  });
+}
+
+async function ensureDeviceRegistered() {
+  if (!authState.isLoggedIn || !authState.token) return;
+
+  let device = await getDeviceInfo();
+  if (!device) {
+    device = { device_id: _generateDeviceId() };
+    await saveDeviceInfo(device);
+  }
+
+  // If we already have a secret, assume registered
+  if (device.device_secret) return device;
+
+  // Call register endpoint using current access token
+  try {
+    const resp = await fetch(`${API_BASE_URL}/device/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authState.token}`
+      },
+      body: JSON.stringify({
+        device_id: device.device_id,
+        device_name: navigator.userAgent || 'extension',
+        device_email: authState.linkedGmail || authState.email || ''
+      })
+    });
+
+    if (!resp.ok) {
+      console.warn('Device register failed', resp.status);
+      return null;
+    }
+
+    const data = await resp.json();
+    // Store returned device_secret and use returned access_token
+    device.device_secret = data.device_secret;
+    await saveDeviceInfo(device);
+
+    if (data.access_token) {
+      authState.token = data.access_token;
+      chrome.storage.local.set({ 'contentGuardianAuth': authState });
+    }
+
+    return device;
+  } catch (e) {
+    console.error('Error registering device', e);
+    return null;
+  }
 }
 
 // Call API with authentication
@@ -89,33 +159,34 @@ async function callApi(endpoint, method = 'GET', data = null) {
 // Refresh the auth token
 async function refreshToken() {
   try {
-    const refreshToken = authState.refreshToken;
-    if (!refreshToken) {
-      setLoggedOut();
-      return false;
+    // Prefer device refresh when possible
+    const device = await getDeviceInfo();
+    if (device && device.device_secret && device.device_id) {
+      const response = await fetch(`${API_BASE_URL}/device/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: device.device_id, device_secret: device.device_secret })
+      });
+
+      if (!response.ok) {
+        setLoggedOut();
+        return false;
+      }
+
+      const data = await response.json();
+      // Update auth token and rotate stored device_secret
+      if (data.access_token) authState.token = data.access_token;
+      if (data.device_secret) {
+        device.device_secret = data.device_secret;
+        await saveDeviceInfo(device);
+      }
+      chrome.storage.local.set({ 'contentGuardianAuth': authState });
+      return true;
     }
 
-    const response = await fetch(`${API_BASE_URL}/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken })
-    });
-
-    if (!response.ok) {
-      setLoggedOut();
-      return false;
-    }
-
-    const data = await response.json();
-    
-    // Update auth state
-    authState.token = data.access_token;
-    authState.refreshToken = data.refresh_token;
-    
-    // Save to storage
-    chrome.storage.local.set({ 'contentGuardianAuth': authState });
-    
-    return true;
+    // Fallback: no device secret available
+    setLoggedOut();
+    return false;
   } catch (error) {
     console.error('Token refresh error:', error);
     setLoggedOut();
@@ -410,8 +481,8 @@ function initializeWebSocket() {
   if (websocket) {
     websocket.close();
   }
-
-  const wsUrl = `ws://localhost:8000/ws/extension/${authState.userId}`;
+  const tokenParam = encodeURIComponent(authState.token || '');
+  const wsUrl = `ws://localhost:8000/ws/extension/${authState.userId}?token=${tokenParam}`;
   websocket = new WebSocket(wsUrl);
   
   websocket.onopen = () => {
@@ -427,9 +498,24 @@ function initializeWebSocket() {
     console.error('WebSocket error:', error);
   };
   
-  websocket.onclose = () => {
-    console.log('WebSocket connection closed');
-    // Attempt to reconnect after delay
+  websocket.onclose = async (event) => {
+    console.log('WebSocket connection closed', event && event.code);
+    // If server closed due to auth (1008), attempt device refresh then reconnect immediately
+    try {
+      if (event && event.code === 1008) {
+        const ok = await refreshToken();
+        if (ok) {
+          // Ensure device is registered (may rotate secret) then reconnect
+          await ensureDeviceRegistered();
+          initializeWebSocket();
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error during WS auth-reconnect', e);
+    }
+
+    // Default: exponential backoff reconnect
     setTimeout(initializeWebSocket, 5000);
   };
 }
@@ -1356,8 +1442,8 @@ function initialize() {
     // Register extension installation
     registerExtension();
     
-    // Initialize WebSocket connection
-    initializeWebSocket();
+    // Ensure device is registered and then initialize WebSocket connection
+    ensureDeviceRegistered().then(() => initializeWebSocket());
     
     // Start heartbeat interval
     startHeartbeatInterval();

@@ -28,6 +28,9 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Check supervised mode status for UI
   checkSupervisionStatus();
+  
+  // Ensure device is registered for logged-in users
+  ensureDeviceRegisteredPopup();
 });
 
 // Check supervision status for UI
@@ -95,6 +98,61 @@ function toggleSupervisionMode() {
       }
     }
   );
+}
+
+
+// --- Device helpers for popup ---
+function _generateDeviceId() {
+  return 'dev-' + Math.random().toString(36).slice(2) + '-' + Date.now().toString(36);
+}
+
+function getDeviceInfoPopup() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['contentGuardianDevice'], function(result) {
+      resolve(result.contentGuardianDevice || null);
+    });
+  });
+}
+
+function saveDeviceInfoPopup(device) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ 'contentGuardianDevice': device }, function() { resolve(true); });
+  });
+}
+
+async function ensureDeviceRegisteredPopup() {
+  chrome.storage.local.get(['contentGuardianAuth'], async function(result) {
+    const auth = result.contentGuardianAuth;
+    if (!auth || !auth.isLoggedIn || !auth.token) return;
+
+    let device = await getDeviceInfoPopup();
+    if (!device) {
+      device = { device_id: _generateDeviceId() };
+      await saveDeviceInfoPopup(device);
+    }
+    if (device.device_secret) return; // already registered
+
+    try {
+      const resp = await fetch('http://localhost:8000/api/device/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${auth.token}`
+        },
+        body: JSON.stringify({ device_id: device.device_id, device_name: navigator.userAgent || 'extension', device_email: auth.linkedGmail || auth.email || '' })
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      device.device_secret = data.device_secret;
+      await saveDeviceInfoPopup(device);
+      if (data.access_token) {
+        auth.token = data.access_token;
+        chrome.storage.local.set({ 'contentGuardianAuth': auth });
+      }
+    } catch (e) {
+      console.error('Popup device register error', e);
+    }
+  });
 }
 
 // Main function to check the current tab
