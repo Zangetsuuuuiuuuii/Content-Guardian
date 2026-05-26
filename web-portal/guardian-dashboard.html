@@ -140,6 +140,12 @@
                     <a class="nav-link" href="#sessions-panel" data-bs-toggle="tab">
                         <i class="bi bi-shield-check"></i> Supervision Sessions
                     </a>
+                    <a class="nav-link" href="#live-logs-panel" data-bs-toggle="tab" onclick="loadLiveLogs()">
+                        <i class="bi bi-activity"></i> Live Activity Logs
+                    </a>
+                    <a class="nav-link" href="#devices-panel" data-bs-toggle="tab" onclick="loadGuardedDevices()">
+                        <i class="bi bi-laptop"></i> Devices
+                    </a>
                     <a class="nav-link" href="#settings-panel" data-bs-toggle="tab">
                         <i class="bi bi-gear"></i> Settings
                     </a>
@@ -225,6 +231,66 @@
                                     </thead>
                                     <tbody id="sessionsList">
                                         <!-- Sessions will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Logs Panel -->
+                    <div class="tab-pane fade" id="live-logs-panel">
+                        <h2 class="mb-4">Live Activity Logs</h2>
+                        
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Real-time Browsing</span>
+                                <span class="refresh-btn" onclick="loadLiveLogs()">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </span>
+                            </div>
+                            <div class="card-body p-0">
+                                <table class="table table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>User</th>
+                                            <th>Time</th>
+                                            <th>URL</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="liveLogsList">
+                                        <!-- Logs will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Devices Panel -->
+                    <div class="tab-pane fade" id="devices-panel">
+                        <h2 class="mb-4">Guarded Devices</h2>
+                        
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>All Connected Devices</span>
+                                <span class="refresh-btn" onclick="loadGuardedDevices()">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </span>
+                            </div>
+                            <div class="card-body p-0">
+                                <table class="table table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Device ID</th>
+                                            <th>User</th>
+                                            <th>Email</th>
+                                            <th>Last Seen</th>
+                                            <th>Status</th>
+                                            <th>Audit / Revoke</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="devicesList">
+                                        <!-- Devices will be loaded here -->
                                     </tbody>
                                 </table>
                             </div>
@@ -485,6 +551,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/web-history-tracker.js"></script>
     <script src="js/user-management.js"></script>
+    <script src="guardian-dashboard-scripts.js"></script>
     <script>
         // Make sure we have the userManagement instance
         if (!window.userManagement) {
@@ -651,7 +718,7 @@
         function connectWebSocket() {
             if (!authData || !authData.userId) return;
             
-            const wsUrl = `ws://localhost:8000/ws/guardian/${authData.userId}`;
+            const wsUrl = `ws://localhost:8000/ws/guardian/${authData.userId}?token=${authData.token}`;
             wsConnection = new WebSocket(wsUrl);
             
             wsConnection.onopen = () => {
@@ -661,6 +728,12 @@
             wsConnection.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 handleWebSocketMessage(data);
+                if (data.type === 'browsing_log') {
+                    if(typeof loadLiveLogs === 'function') loadLiveLogs();
+                    if(data.status === 'blocked') {
+                        showAlert(`Blocked navigation to ${data.url}`, 'danger');
+                    }
+                }
             };
             
             wsConnection.onclose = () => {

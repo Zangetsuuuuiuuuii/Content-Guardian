@@ -753,13 +753,12 @@ async function logBlockedSite(url, blockType, emailInfo = null) {
     
     // Log to backend
     const logData = {
-      user_id: authState.userId,
       url: url,
-      content_type: blockType,
-      device_email: emailInfo || 'unknown'
+      title: document.title || 'Unknown',
+      status: 'blocked'
     };
 
-    const response = await callApi('/guardian/logs', 'POST', logData);
+    const response = await callApi('/logs/browsing', 'POST', logData);
     
     // Send alert to guardian
     await sendContentAlert(url, blockType, contentExcerpt, emailInfo);
@@ -1484,17 +1483,37 @@ function initialize() {
     });
 }
 
+async function logBrowsingActivity() {
+    if (!supervised_mode || !authState.isLoggedIn) return;
+    try {
+        const title = document.title;
+        const url = window.location.href;
+        
+        await callApi('/logs/browsing', 'POST', {
+            url: url,
+            title: title || 'Unknown Title',
+            status: 'allowed'
+        });
+    } catch (e) {
+        console.error('Failed to log browsing activity:', e);
+    }
+}
+
 // Run on page load
 window.addEventListener('load', () => {
     // Skip for whitelisted URLs
     if (isWhitelistedUrl()) {
         console.log('Content Guardian: Load events skipped for whitelisted URL');
+        
+        // Even if whitelisted, log the activity if supervised!
+        logBrowsingActivity();
         return;
     }
     
     initialize();
     checkPreviousBlock();
     setTimeout(analyzePageContent, 2000);
+    logBrowsingActivity();
 });
 
 // Function to analyze an image

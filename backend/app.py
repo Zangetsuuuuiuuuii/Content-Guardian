@@ -186,6 +186,20 @@ def init_db():
     )
     ''')
 
+    # Browsing logs table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS browsing_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        device_id TEXT,
+        url TEXT NOT NULL,
+        title TEXT,
+        status TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+    ''')
+
     # Migrate devices table: ensure refresh_expires_at and last_rotated_at columns exist
     cursor.execute("PRAGMA table_info('devices')")
     existing_cols = [r[1] for r in cursor.fetchall()]
@@ -341,8 +355,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
             raise credentials_exception
 
     conn.close()
-    return dict(user)
-
+    user_dict = dict(user)
+    if device_id:
+        user_dict["device_id"] = device_id
+    return user_dict
 
 def get_user_from_token(token: str):
     """Decode a JWT token (used for WebSocket auth) and validate optional device binding.
@@ -431,6 +447,7 @@ class DeviceRegisterRequest(BaseModel):
 
 class RevokeDeviceRequest(BaseModel):
     device_id: str
+    reason: Optional[str] = None
 
 
 def _hash_token(token: str) -> str:
@@ -466,6 +483,11 @@ class AlertRequest(BaseModel):
     url: str
     device_email: Optional[str] = None
     email_verified: Optional[bool] = False
+
+class BrowsingLogRequest(BaseModel):
+    url: str
+    title: Optional[str] = None
+    status: Optional[str] = 'allowed'
 
 class UserRegistrationRequest(BaseModel):
     full_name: str
@@ -805,6 +827,30 @@ async def list_devices(current_user: dict = Depends(get_current_user)):
     conn.close()
     return [dict(r) for r in rows]
 
+@app.get("/api/device/{device_id}/audit")
+async def get_device_audit(device_id: str, current_user: dict = Depends(get_current_user)):
+    """Get the audit log for a specific device."""
+    conn = get_db()
+    # verify ownership or guardian
+    dev = conn.execute("SELECT user_id FROM devices WHERE device_id = ?", (device_id,)).fetchone()
+    if not dev:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Device not found")
+        
+    user_id = dev["user_id"]
+    if current_user["id"] != user_id:
+        if current_user["role"] != "guardian":
+            conn.close()
+            raise HTTPException(status_code=403, detail="Not authorized")
+        link = conn.execute("SELECT id FROM guardian_user_links WHERE guardian_id = ? AND user_id = ? AND active = 1", (current_user["id"], user_id)).fetchone()
+        if not link:
+            conn.close()
+            raise HTTPException(status_code=403, detail="Not authorized")
+            
+    rows = conn.execute("SELECT action, performed_by, reason, created_at FROM device_audit WHERE device_id = ? ORDER BY created_at DESC", (device_id,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
 
 @app.post("/api/device/revoke")
 async def revoke_device(request: RevokeDeviceRequest, current_user: dict = Depends(get_current_user)):
@@ -829,7 +875,7 @@ async def revoke_device(request: RevokeDeviceRequest, current_user: dict = Depen
     conn.execute("UPDATE devices SET revoked = 1 WHERE device_id = ?", (request.device_id,))
     conn.commit()
     try:
-        _log_device_audit(conn, request.device_id, 'revoke', performed_by=current_user.get('id'))
+        _log_device_audit(conn, request.device_id, 'revoke', performed_by=current_user.get('id'), reason=request.reason)
     except Exception:
         pass
     conn.close()
@@ -936,6 +982,44 @@ async def create_alert(request: AlertRequest, current_user: dict = Depends(get_c
 
     return {"status": "created", "alert_id": alert_id}
 
+@app.post("/api/logs/browsing")
+async def log_browsing(request: BrowsingLogRequest, current_user: dict = Depends(get_current_user)):
+    """Extension posts real-time browsing log here."""
+    conn = get_db()
+    
+    # Needs to find guardian to send WS
+    guardian = conn.execute(
+        "SELECT guardian_id FROM guardian_user_links WHERE user_id = ? AND active = 1",
+        (current_user["id"],)
+    ).fetchone()
+
+    device_id = current_user.get("device_id") # extracted during get_current_user
+    
+    now = datetime.now().isoformat()
+    cursor = conn.execute('''
+        INSERT INTO browsing_logs (user_id, device_id, url, title, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (current_user["id"], device_id, request.url, request.title, request.status, now))
+    log_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    if guardian:
+        guardian_id = guardian["guardian_id"]
+        # Broadcast immediately to guardian
+        await ws_manager.send_to_guardian(guardian_id, {
+            "type": "browsing_log",
+            "log_id": log_id,
+            "user_id": current_user["id"],
+            "device_id": device_id,
+            "url": request.url,
+            "title": request.title,
+            "status": request.status,
+            "created_at": now
+        })
+        
+    return {"status": "logged", "log_id": log_id}
+
 
 @app.get("/api/guardian/alerts")
 async def get_guardian_alerts(current_user: dict = Depends(get_current_user)):
@@ -957,6 +1041,24 @@ async def get_guardian_alerts(current_user: dict = Depends(get_current_user)):
 async def get_guardian_logs(current_user: dict = Depends(get_current_user)):
     return await get_guardian_alerts(current_user)
 
+
+@app.get("/api/guardian/browsing-logs")
+async def get_guardian_browsing_logs(current_user: dict = Depends(get_current_user)):
+    """Get browsing logs for users linked to the current guardian."""
+    if current_user["role"] != "guardian":
+        raise HTTPException(status_code=403, detail="Guardian role required")
+
+    conn = get_db()
+    rows = conn.execute('''
+        SELECT bl.*, u.full_name as user_name 
+        FROM browsing_logs bl
+        JOIN guardian_user_links gl ON gl.user_id = bl.user_id
+        JOIN users u ON u.id = bl.user_id
+        WHERE gl.guardian_id = ? AND gl.active = 1
+        ORDER BY bl.created_at DESC LIMIT 200
+    ''', (current_user["id"],)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 # ===========================================================================
 #  GUARDIAN — USER MANAGEMENT
