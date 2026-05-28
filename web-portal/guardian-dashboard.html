@@ -749,6 +749,10 @@
 
         function handleWebSocketMessage(data) {
             switch(data.type) {
+                case 'override_request':
+                    showNotification('Override Request', `${data.user_name} requested access to ${data.url}. Bypass Code: ${data.bypass_code}`);
+                    showAlert(`<strong>Override Request:</strong> ${data.user_name} wants to unblock ${data.url}.<br><strong>Give them this Bypass Code:</strong> <span style="font-size:1.5em;letter-spacing:2px;color:#d9534f;">${data.bypass_code}</span>`, 'warning');
+                    break;
                 case 'new_key':
                     // Show notification and update alerts list
                     showNotification('New content alert', `${data.data.user_name} attempted to access blocked content`);
@@ -756,12 +760,15 @@
                     loadContentLogs();
                     break;
                     
+                case 'session_started':
                 case 'supervision_started':
                     // Update sessions list
                     loadSessions();
+                    showAlert(`${data.user_name} successfully started a supervised session.`, 'info');
                     break;
                     
                 case 'supervision_ended':
+                case 'session_ended':
                     // Update sessions list
                     loadSessions();
                     break;

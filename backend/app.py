@@ -500,6 +500,13 @@ class UserRegistrationRequest(BaseModel):
 class EndSessionRequest(BaseModel):
     session_id: int
 
+class SupervisionRequestRequest(BaseModel):
+    url: str
+    content_type: str
+
+class StartWithKeyRequest(BaseModel):
+    bypass_code: str
+
 class GenerateKeyRequest(BaseModel):
     description: Optional[str] = None
     expires_in_days: Optional[int] = 30
@@ -1138,6 +1145,102 @@ async def start_session(request: StartSessionRequest, current_user: dict = Depen
     })
 
     return {"status": "started", "session_id": session_id}
+
+
+@app.post("/api/supervision/request")
+async def request_supervision(req: SupervisionRequestRequest, current_user: dict = Depends(get_current_user)):
+    """User requests guardian to override a block."""
+    if current_user["role"] != "user":
+        raise HTTPException(status_code=403, detail="Only users can request supervision")
+    
+    conn = get_db()
+    
+    # 1. Find guardian(s) for this user
+    guardians = conn.execute(
+        "SELECT guardian_id FROM guardian_user_links WHERE user_id = ? AND active = 1",
+        (current_user["id"],)
+    ).fetchall()
+    
+    if not guardians:
+       conn.close()
+       raise HTTPException(status_code=404, detail="No active guardian found to request overrides from.")
+    
+    import random
+    bypass_code = f"{random.randint(100000, 999999)}"
+    now = datetime.now()
+    expires_at = (now + timedelta(hours=1)).isoformat()
+    
+    description = f"Override request by {current_user['full_name']} for {req.url} ({req.content_type})"
+    
+    conn.execute(
+        "INSERT INTO access_keys (key_value, created_at, expires_at, created_by, description) VALUES (?, ?, ?, ?, ?)",
+        (bypass_code, now.isoformat(), expires_at, current_user["id"], description)
+    )
+    conn.commit()
+    conn.close()
+
+    # Alert Guardian(s) via WebSockets
+    for g in guardians:
+        guardian_id = g["guardian_id"]
+        await ws_manager.send_to_guardian(guardian_id, {
+            "type": "override_request",
+            "user_id": current_user["id"],
+            "user_name": current_user["full_name"],
+            "url": req.url,
+            "content_type": req.content_type,
+            "bypass_code": bypass_code
+        })
+        
+    return {"status": "request_sent"}
+
+@app.post("/api/supervision/start_with_key")
+async def start_with_key(req: StartWithKeyRequest, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "user":
+         raise HTTPException(status_code=403, detail="Only users can start sessions this way")
+    
+    conn = get_db()
+    
+    # Find valid unrevoked key
+    now_iso = datetime.now().isoformat()
+    key_row = conn.execute(
+        "SELECT id, created_by FROM access_keys WHERE key_value = ? AND revoked = 0 AND (expires_at IS NULL OR expires_at > ?)",
+        (req.bypass_code, now_iso)
+    ).fetchone()
+    
+    if not key_row:
+        conn.close()
+        raise HTTPException(status_code=401, detail="Invalid or expired bypass code")
+    
+    # Mark key as used/revoked
+    conn.execute("UPDATE access_keys SET revoked = 1 WHERE id = ?", (key_row["id"],))
+    
+    # Find the guardian to link the session
+    guardian = conn.execute("SELECT guardian_id FROM guardian_user_links WHERE user_id = ? AND active=1", (current_user["id"],)).fetchone()
+    guardian_id = guardian["guardian_id"] if guardian else None
+
+    if not guardian_id:
+         conn.close()
+         raise HTTPException(status_code=400, detail="Cannot start session devoid of a Guardian")
+    
+    now = datetime.now().isoformat()
+    cursor = conn.execute(
+        "INSERT INTO supervision_sessions (guardian_id, user_id, started_at, status) VALUES (?, ?, ?, 'active')",
+        (guardian_id, current_user["id"], now),
+    )
+    session_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    
+    # Notify Guardian of active session
+    await ws_manager.send_to_guardian(guardian_id, {
+         "type": "session_started",
+         "session_id": session_id,
+         "user_id": current_user["id"],
+         "user_name": current_user["full_name"],
+         "started_at": now
+    })
+    
+    return {"status": "success", "session_id": session_id}
 
 
 @app.post("/api/supervision/end")

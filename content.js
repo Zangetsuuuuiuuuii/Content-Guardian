@@ -524,6 +524,7 @@ function initializeWebSocket() {
 function handleWebSocketMessage(message) {
   switch (message.type) {
     case 'end_supervision':
+    case 'session_ended':
       endSupervisionSession();
       break;
     case 'force_refresh':
@@ -531,6 +532,13 @@ function handleWebSocketMessage(message) {
       break;
     case 'display_message':
       showNotification(message.title, message.content);
+      break;
+    case 'session_started':
+      // API started a session successfully
+      startLocalSupervisionSession().then(() => {
+          localStorage.setItem('contentGuardianStatus', 'supervised');
+          window.location.reload();
+      });
       break;
     default:
       console.log('Unknown message type:', message.type);
@@ -799,15 +807,6 @@ async function showContentBlocker(blockType) {
   const emailInfo = authState.linkedGmail || "unverified";
   await logBlockedSite(window.location.href, blockType, emailInfo);
   
-  // Generate key via API
-  const keyResponse = await generateAccessKey(window.location.href, blockType);
-  const accessKey = keyResponse ? keyResponse.key_value : null;
-  
-  if (!accessKey) {
-    console.error('Failed to generate access key, using fallback local method');
-    return showFallbackContentBlocker(blockType);
-  }
-  
   // Build overlay
   const blockerDiv = document.createElement('div');
   blockerDiv.id = 'content-guardian-blocker';
@@ -922,38 +921,78 @@ async function showContentBlocker(blockType) {
     loginMessage.appendChild(signInButton);
     blockerDiv.appendChild(loginMessage);
   } else {
-    // For all users, show Enter Supervised Mode button
-    const supervisedModeButton = document.createElement('button');
-    supervisedModeButton.innerText = 'Enter Supervised Mode';
-    supervisedModeButton.style.padding = '12px 24px';
-    supervisedModeButton.style.fontSize = '16px';
-    supervisedModeButton.style.backgroundColor = '#4CAF50';
-    supervisedModeButton.style.color = 'white';
-    supervisedModeButton.style.border = 'none';
-    supervisedModeButton.style.borderRadius = '4px';
-    supervisedModeButton.style.cursor = 'pointer';
-    supervisedModeButton.style.marginTop = '20px';
+    // For authenticated users, allow requesting override from Guardian
+    const overrideContainer = document.createElement('div');
+    overrideContainer.style.marginTop = '20px';
+    overrideContainer.style.display = 'flex';
+    overrideContainer.style.flexDirection = 'column';
+    overrideContainer.style.alignItems = 'center';
     
-    supervisedModeButton.addEventListener('click', async function() {
-      // Start supervised mode directly without verification
-      await startLocalSupervisionSession();
-      
-      // Remove blocker overlays
-      document.body.style.overflow = 'auto';
-      blockerDiv.remove();
-      
-      // Remove blur overlay
-      const blurOverlay = document.querySelector('div[style*="backdrop-filter: blur"]');
-      if (blurOverlay) blurOverlay.remove();
-      
-      // Update status
-      localStorage.setItem('contentGuardianStatus', 'supervised');
-      
-      // Reload page to reset content
-      window.location.reload();
+    const requestAccessBtn = document.createElement('button');
+    requestAccessBtn.innerText = 'Request Guardian Override';
+    requestAccessBtn.style.padding = '12px 24px';
+    requestAccessBtn.style.fontSize = '16px';
+    requestAccessBtn.style.backgroundColor = '#2196F3';
+    requestAccessBtn.style.color = 'white';
+    requestAccessBtn.style.border = 'none';
+    requestAccessBtn.style.borderRadius = '4px';
+    requestAccessBtn.style.cursor = 'pointer';
+    
+    requestAccessBtn.addEventListener('click', async function() {
+      // 1. Alert backend to send WS to guardian
+      requestAccessBtn.innerText = 'Requesting...';
+      requestAccessBtn.disabled = true;
+      try {
+        await callApi('/supervision/request', 'POST', {
+            url: window.location.href,
+            content_type: blockType
+        });
+        
+        // 2. Change UI to Code Input
+        overrideContainer.innerHTML = `
+          <p style="margin-bottom:10px; color:#4CAF50;">Request sent! Please enter the bypass code provided by your Guardian.</p>
+          <div style="display:flex; gap:10px;">
+            <input type="text" id="guardian-bypass-code" placeholder="Enter Code" style="padding:10px; font-size:16px; width:150px; text-align:center; border:1px solid #ccc; border-radius:4px; color:black;">
+            <button id="guardian-unlock-btn" style="padding:10px 20px; font-size:16px; background-color:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer;">Unlock</button>
+          </div>
+          <p id="guardian-bypass-error" style="color:#ffcccc; margin-top:10px; display:none;">Invalid code. Try again.</p>
+        `;
+        
+        document.getElementById('guardian-unlock-btn').addEventListener('click', async () => {
+             const code = document.getElementById('guardian-bypass-code').value.trim();
+             if(!code) return;
+             
+             document.getElementById('guardian-unlock-btn').innerText = 'Verifying...';
+             try {
+                const startRes = await callApi('/supervision/start_with_key', 'POST', { bypass_code: code });
+                if(startRes && startRes.status === 'success') {
+                    // Start supervised mode locally because API verified it
+                    await startLocalSupervisionSession();
+                    
+                    document.body.style.overflow = 'auto';
+                    blockerDiv.remove();
+                    const blurOverlay = document.querySelector('div[style*="backdrop-filter: blur"]');
+                    if (blurOverlay) blurOverlay.remove();
+                    
+                    localStorage.setItem('contentGuardianStatus', 'supervised');
+                    window.location.reload();
+                } else {
+                    throw new Error("Invalid");
+                }
+             } catch(err) {
+                 document.getElementById('guardian-unlock-btn').innerText = 'Unlock';
+                 document.getElementById('guardian-bypass-error').style.display = 'block';
+             }
+        });
+      } catch(err) {
+        requestAccessBtn.innerText = 'Failed to request. Retry?';
+        requestAccessBtn.disabled = false;
+        console.error(err);
+      }
     });
     
-    blockerDiv.appendChild(supervisedModeButton);
+    overrideContainer.appendChild(requestAccessBtn);
+    blockerDiv.appendChild(overrideContainer);
   }
 
   // If email verification needed, show additional message
